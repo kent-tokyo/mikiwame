@@ -1,0 +1,53 @@
+name: Publish to crates.io
+
+on:
+  push:
+    tags: ['v[0-9]*.[0-9]*.[0-9]*']
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Verify tag matches Cargo.toml version
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          cargo_version=$(grep -m1 '^version' Cargo.toml | sed -E 's/version = "(.*)"/\1/')
+          if [ "$tag_version" != "$cargo_version" ]; then
+            echo "tag $GITHUB_REF_NAME does not match Cargo.toml version $cargo_version"
+            exit 1
+          fi
+
+      - name: Format check
+        run: cargo fmt --all -- --check
+
+      - name: Clippy (all features)
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Clippy (no default features)
+        run: cargo clippy --all-targets --no-default-features -- -D warnings
+
+      - name: Test (all features)
+        run: cargo test --all-features
+
+      - name: Test (no default features)
+        run: cargo test --no-default-features
+
+      - name: Doc check
+        run: cargo doc --all-features --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+      - name: Publish to crates.io
+        run: cargo publish --token "$CARGO_REGISTRY_TOKEN"
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
