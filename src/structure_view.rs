@@ -102,3 +102,101 @@ pub(crate) fn minimum_image_distance(lattice: &[[f64; 3]; 3], a: [f64; 3], b: [f
     let cart = frac_to_cart(lattice, delta);
     (cart[0] * cart[0] + cart[1] * cart[1] + cart[2] * cart[2]).sqrt()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TOL: f64 = 1e-9;
+
+    fn approx(actual: f64, expected: f64) {
+        assert!(
+            (actual - expected).abs() < TOL,
+            "expected {expected}, got {actual}"
+        );
+    }
+
+    #[test]
+    fn cell_volume_of_cubic_cell_is_a_cubed() {
+        let a = 5.6402;
+        let lattice = [[a, 0.0, 0.0], [0.0, a, 0.0], [0.0, 0.0, a]];
+        approx(cell_volume(&lattice), a * a * a);
+    }
+
+    #[test]
+    fn cell_volume_of_hexagonal_cell_matches_closed_form() {
+        // a = b = 3, c = 5, gamma = 120 degrees, alpha = beta = 90 degrees.
+        // Non-orthogonal: every other fixture in this crate is cubic, where a
+        // row/column transposition bug in the volume or frac_to_cart formula
+        // would be invisible. This one catches it.
+        let a = 3.0_f64;
+        let c = 5.0_f64;
+        let gamma = 120f64.to_radians();
+        let lattice = [
+            [a, 0.0, 0.0],
+            [a * gamma.cos(), a * gamma.sin(), 0.0],
+            [0.0, 0.0, c],
+        ];
+        approx(cell_volume(&lattice), a * a * c * gamma.sin());
+    }
+
+    #[test]
+    fn frac_to_cart_uses_row_vector_convention() {
+        let lattice = [
+            [3.0, 0.0, 0.0],
+            [
+                3.0 * 120f64.to_radians().cos(),
+                3.0 * 120f64.to_radians().sin(),
+                0.0,
+            ],
+            [0.0, 0.0, 5.0],
+        ];
+        // A unit step along one fractional axis must land exactly on that
+        // lattice row: pins the row-vector convention so a future refactor to
+        // column-vectors fails loudly instead of silently (both conventions
+        // agree on a diagonal/cubic lattice, which is why no cubic fixture
+        // elsewhere in this crate would catch a transposition).
+        assert_eq!(frac_to_cart(&lattice, [1.0, 0.0, 0.0]), lattice[0]);
+        assert_eq!(frac_to_cart(&lattice, [0.0, 1.0, 0.0]), lattice[1]);
+    }
+
+    #[test]
+    fn minimum_image_distance_wraps_across_the_cell_boundary() {
+        let a = 5.6402;
+        let lattice = [[a, 0.0, 0.0], [0.0, a, 0.0], [0.0, 0.0, a]];
+        let d = minimum_image_distance(&lattice, [0.05, 0.0, 0.0], [0.95, 0.0, 0.0]);
+        // True separation is 0.1 cell widths through the periodic boundary,
+        // not 0.9 straight across the cell.
+        approx(d, 0.1 * a);
+    }
+
+    #[test]
+    fn naive_minimum_image_can_miss_the_true_minimum_on_a_skewed_cell() {
+        // Documents the ceiling named in minimum_image_distance's `ponytail`
+        // comment. With nearly-parallel lattice vectors a and b, a legitimate
+        // periodic image (p vs. q shifted by one whole b vector) is
+        // dramatically shorter than what independent per-axis rounding finds
+        // — because that image requires a *different* integer shift on the a
+        // axis than on the b axis, which per-axis rounding of a single delta
+        // cannot produce when both components start out equal.
+        let lattice = [[1.0, 0.0, 0.0], [0.9, 0.1, 0.0], [0.0, 0.0, 10.0]];
+        let p = [0.75, 0.75, 0.0];
+        let q = [0.25, 0.25, 0.0];
+
+        let naive = minimum_image_distance(&lattice, p, q);
+
+        let q_shifted_by_b = [q[0], q[1] + 1.0, q[2]];
+        let true_delta = [
+            p[0] - q_shifted_by_b[0],
+            p[1] - q_shifted_by_b[1],
+            p[2] - q_shifted_by_b[2],
+        ];
+        let cart = frac_to_cart(&lattice, true_delta);
+        let true_min = (cart[0] * cart[0] + cart[1] * cart[1] + cart[2] * cart[2]).sqrt();
+
+        assert!(
+            true_min < naive * 0.5,
+            "expected a much shorter periodic image ({true_min}) than the naive result ({naive})"
+        );
+    }
+}

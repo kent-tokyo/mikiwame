@@ -5,11 +5,17 @@
 - [ ] Review `docs/chematic-prerequisites.md` and decide whether/when to open the
       `chematic` PR for `Lattice`/`PeriodicStructure`/periodic-neighbor-search/occupancy
       CIF reading. Not started; separate repo/PR per AGENTS.md §4.
+- [ ] Decide the source for an elemental radius table, needed for `SITE_SEVERE_OVERLAP` /
+      `SITE_UNUSUALLY_SHORT_DISTANCE` (AGENTS.md §7.3). Candidate: Cordero et al.,
+      *Covalent radii revisited*, Dalton Trans. 2008, 2832–2838 — the table used (cited or
+      re-derived) by ASE (`ase.data.covalent_radii`), pymatgen, and most other open-source
+      chem/materials tools under permissive licenses. Not implemented here: AGENTS.md §22
+      lists "利用候補データのライセンス/再配布条件が不明" as a stop-and-report condition,
+      and embedding ~90 numeric values from memory or an unverified fetch is exactly the
+      kind of "plausible-sounding" data §21 warns against without an owner-reviewed source.
 
 ## Needs a cited source before implementation (do not guess thresholds)
 
-- [ ] Elemental radius table (source + version) for `SITE_SEVERE_OVERLAP` /
-      `SITE_UNUSUALLY_SHORT_DISTANCE` (AGENTS.md §7.3).
 - [ ] Documented criterion for "extreme" lattice aspect ratio / poor conditioning
       (`LATTICE_EXTREME_ASPECT_RATIO`, `LATTICE_POORLY_CONDITIONED`) — currently only
       `LATTICE_SINGULAR` (volume ≤ 0 or numerically singular) is implemented, since that
@@ -40,7 +46,9 @@
       not yet created.
 - [ ] Phase 6: known-good fixture set beyond the single NaCl-style fixture in `tests/`,
       metamorphic tests (rotation/translation/permutation/supercell invariance),
-      differential comparison against pymatgen/spglib, benchmark report.
+      differential comparison against pymatgen/spglib (no Python materials stack is
+      installed in the dev environment used so far — see `docs/validation.md`), benchmark
+      report.
 - [ ] Phase 7: release checklist, docs.rs/crates.io checks, semver audit.
 
 ## Done this round
@@ -53,3 +61,6 @@
 - [x] Phase 2 (no-threshold subset only): `INPUT_EMPTY_STRUCTURE`,
       `INPUT_NONFINITE_COORDINATE`, `INPUT_INVALID_OCCUPANCY`, `LATTICE_SINGULAR`,
       `SITE_DUPLICATE`.
+- [x] Closed-form geometry unit tests (`cell_volume`, `frac_to_cart`,
+      `minimum_image_distance`) on a non-orthogonal lattice, plus a test demonstrating
+      (not just claiming) the naive minimum-image ceiling. `docs/validation.md` created.
