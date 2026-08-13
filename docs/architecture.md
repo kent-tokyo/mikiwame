@@ -99,5 +99,4 @@ only reported as `None`/absent.
 * CLI (`src/bin/mikiwame.rs`) — Phase 5.
 * Corpus/prototype similarity — optional, post-v0.1 per AGENTS.md §10.
 * `MikiwameHandoff` (gugen handoff type) — future, per AGENTS.md §18, not built now.
-* `README_ja.md` — English README only for now; translation is not a design decision.
 * `mikiwame-cli` split — only if the CLI grows large enough to warrant it (AGENTS.md §12).

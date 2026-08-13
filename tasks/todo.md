@@ -93,3 +93,5 @@
       it with a warning to stderr and a final skipped-count summary, matching
       `analyze_batch`'s own per-structure guarantee extended to file parsing. Fails only
       if every line in the file is unparseable.
+- [x] `README_ja.md` added (translation, not a design decision — was only deferred for
+      that reason, per `docs/architecture.md`).
