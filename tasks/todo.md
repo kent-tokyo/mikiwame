@@ -39,11 +39,11 @@
 - [ ] Phase 4: composition/oxidation-state plausibility.
 - [ ] Phase 4: occupancy/disorder diagnostics beyond the input-quality sum/range checks
       already in `diagnostics/input_quality.rs`.
-- [ ] Phase 6: known-good fixture set beyond the single NaCl-style fixture in `tests/`
-      (CsCl, diamond, zinc blende, wurtzite, rutile, perovskite, spinel, graphite per
-      AGENTS.md §15.1). Lower priority than it looks — see `docs/validation.md`: no
-      currently-shipped diagnostic inspects real bond distances, so more known-good
-      fixtures wouldn't exercise any new code path until Phase 3 lands.
+- [ ] Phase 6: wurtzite, rutile, spinel, graphite fixtures — deferred from
+      `tests/known_good_fixtures.rs` (which now covers CsCl, diamond, zinc blende,
+      perovskite) because each needs at least one free internal positional parameter
+      (or, for graphite, was deferred alongside them for consistency) sourced from a
+      citation rather than memory. See `fixtures/README.md`.
 - [ ] Phase 6: differential comparison against pymatgen/spglib (no Python materials
       stack is installed in the dev environment used so far — see `docs/validation.md`),
       benchmark report.
@@ -77,3 +77,6 @@
 - [x] Phase 6 (partial): metamorphic/invariance tests in `tests/metamorphic.rs` — site
       order, origin shift, out-of-range fractional coordinates, lattice rotation, and
       supercell invariance. See `docs/validation.md`.
+- [x] Phase 6 (partial): known-good fixtures for CsCl, diamond, zinc blende, and ideal
+      perovskite in `tests/known_good_fixtures.rs`. See `fixtures/README.md` for why
+      wurtzite/rutile/spinel/graphite are deferred instead.
