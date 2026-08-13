@@ -23,17 +23,14 @@
 - [ ] Formal oxidation-state table (source + version) for §7.6 composition/charge checks.
 - [ ] Neighbor-definition method (name + cutoff rule + provenance) for §7.4 coordination.
 - [ ] Ideal-polyhedron reference set for §7.5 distortion metrics.
-
-## No threshold needed, just not built yet this round
-
-- [ ] `INPUT_UNKNOWN_ELEMENT`: validate `Site::element` against a static periodic-table
-      symbol list (AGENTS.md §7.1 "不明元素"). No threshold involved, just not in the
-      advisor-scoped cut for this pass; `Site::element` is currently an unvalidated
-      `String`.
 - [ ] Out-of-domain applicability detection (surfaces/interfaces/amorphous/polymers,
       AGENTS.md §5): `analyze` currently always reports `ApplicabilityLevel::FullyApplicable`
-      for any input that passes input-quality checks — it does not yet try to recognize
-      these structure classes at all.
+      for any input that passes input-quality checks. Parked here rather than implemented:
+      every structural signal for "this is a slab, not a bulk crystal" (a large vacuum gap,
+      near-2D periodicity) needs a size/ratio cutoff to decide "how much vacuum counts as a
+      surface", which is exactly the kind of "常識的だから" threshold AGENTS.md §21 forbids
+      inventing. Needs a documented criterion (or an explicit decision to accept a
+      conservative one), same as the aspect-ratio item above.
 
 ## Phase backlog (not started)
 
@@ -64,3 +61,6 @@
 - [x] Closed-form geometry unit tests (`cell_volume`, `frac_to_cart`,
       `minimum_image_distance`) on a non-orthogonal lattice, plus a test demonstrating
       (not just claiming) the naive minimum-image ceiling. `docs/validation.md` created.
+- [x] `INPUT_UNKNOWN_ELEMENT`: `Site::element` checked against the 118 IUPAC element
+      symbols (plain enumerable fact, not a measured constant — no citation needed unlike
+      the radius/oxidation tables above). Non-fatal, same reasoning as invalid occupancy.

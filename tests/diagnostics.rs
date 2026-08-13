@@ -155,6 +155,29 @@ fn occupancy_above_one_is_invalid() {
 }
 
 #[test]
+fn unknown_element_symbol_is_flagged_but_not_fatal() {
+    let mut sites = nacl_sites();
+    sites[0].element = "Xx".to_string();
+    let report = analyze(
+        &OwnedStructure::new(nacl_lattice(), sites),
+        &AnalysisConfig::default(),
+    );
+    // Element identity doesn't affect geometry, so this is not fatal, same as
+    // invalid occupancy.
+    assert_eq!(report.overall.verdict, Verdict::ReviewRecommended);
+    assert_eq!(
+        codes(&report.findings),
+        HashSet::from([FindingCode::InputUnknownElement])
+    );
+    assert!(
+        report
+            .components
+            .iter()
+            .all(|c| c.status == ComponentStatus::Ran)
+    );
+}
+
+#[test]
 fn coincident_same_element_sites_are_duplicates() {
     let mut sites = nacl_sites();
     sites[1].fractional = sites[0].fractional; // Na onto Na

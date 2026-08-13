@@ -14,8 +14,10 @@
 /// there is no dedicated multi-species site type in v0.1.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Site {
-    /// Element symbol, e.g. `"Na"`. Not validated against a periodic table in
-    /// v0.1 (see `tasks/todo.md`: `INPUT_UNKNOWN_ELEMENT` is deferred).
+    /// Element symbol, e.g. `"Na"`. Not validated at construction — an
+    /// unrecognized symbol is reported as `INPUT_UNKNOWN_ELEMENT` by
+    /// `analyze`, not rejected here, so the diagnosis can explain what's
+    /// wrong.
     pub element: String,
     /// Fractional coordinates within the unit cell.
     pub fractional: [f64; 3],

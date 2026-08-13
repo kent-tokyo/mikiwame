@@ -25,6 +25,9 @@ pub enum FindingCode {
     /// A site's occupancy is non-finite or outside `[0.0, 1.0]`.
     #[serde(rename = "INPUT_INVALID_OCCUPANCY")]
     InputInvalidOccupancy,
+    /// A site's element symbol is not a recognized periodic-table symbol.
+    #[serde(rename = "INPUT_UNKNOWN_ELEMENT")]
+    InputUnknownElement,
     /// The lattice is singular or has non-positive volume, so periodicity is
     /// undefined or degenerate.
     #[serde(rename = "LATTICE_SINGULAR")]
@@ -43,6 +46,7 @@ impl FindingCode {
             Self::InputNonfiniteLattice => "INPUT_NONFINITE_LATTICE",
             Self::InputNonfiniteCoordinate => "INPUT_NONFINITE_COORDINATE",
             Self::InputInvalidOccupancy => "INPUT_INVALID_OCCUPANCY",
+            Self::InputUnknownElement => "INPUT_UNKNOWN_ELEMENT",
             Self::LatticeSingular => "LATTICE_SINGULAR",
             Self::SiteDuplicate => "SITE_DUPLICATE",
         }

@@ -28,6 +28,25 @@ fn finite3(v: [f64; 3]) -> bool {
     v.iter().all(|x| x.is_finite())
 }
 
+/// IUPAC element symbols 1 (H) through 118 (Og), as of the periodic table's
+/// 2016 completion. Plain factual/enumerable data (not a measured constant),
+/// so unlike the radius/oxidation-state tables in `tasks/todo.md` this needs
+/// no external citation to be trustworthy — it is what "element symbol" means.
+const KNOWN_ELEMENT_SYMBOLS: [&str; 118] = [
+    "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne", "Na", "Mg", "Al", "Si", "P", "S", "Cl",
+    "Ar", "K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Ga", "Ge", "As",
+    "Se", "Br", "Kr", "Rb", "Sr", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "In",
+    "Sn", "Sb", "Te", "I", "Xe", "Cs", "Ba", "La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb",
+    "Dy", "Ho", "Er", "Tm", "Yb", "Lu", "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl",
+    "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th", "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk",
+    "Cf", "Es", "Fm", "Md", "No", "Lr", "Rf", "Db", "Sg", "Bh", "Hs", "Mt", "Ds", "Rg", "Cn", "Nh",
+    "Fl", "Mc", "Lv", "Ts", "Og",
+];
+
+fn is_known_element(symbol: &str) -> bool {
+    KNOWN_ELEMENT_SYMBOLS.contains(&symbol)
+}
+
 pub(crate) fn check<S: PeriodicStructureView>(structure: &S) -> Outcome {
     let mut findings = Vec::new();
     let mut fatal = false;
@@ -87,6 +106,21 @@ pub(crate) fn check<S: PeriodicStructureView>(structure: &S) -> Outcome {
     }
 
     for (index, site) in structure.sites().iter().enumerate() {
+        if !is_known_element(&site.element) {
+            findings.push(Finding {
+                code: FindingCode::InputUnknownElement,
+                severity: Severity::High,
+                confidence: certain(),
+                scope: FindingScope::Site { index },
+                evidence: Vec::new(),
+                explanation: format!(
+                    "site {index} has unrecognized element symbol \"{}\"",
+                    site.element
+                ),
+                limitations: Vec::new(),
+            });
+        }
+
         if !finite3(site.fractional) {
             findings.push(Finding {
                 code: FindingCode::InputNonfiniteCoordinate,
