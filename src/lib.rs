@@ -75,12 +75,14 @@ pub fn analyze<S: PeriodicStructureView>(
     });
 
     if fatal {
-        components.push(ComponentAssessment {
-            name: ComponentName::SiteSeparation,
-            status: ComponentStatus::Skipped {
-                reason: "input quality check found a fatal problem".to_string(),
-            },
-        });
+        for name in [ComponentName::SiteSeparation, ComponentName::Disorder] {
+            components.push(ComponentAssessment {
+                name,
+                status: ComponentStatus::Skipped {
+                    reason: "input quality check found a fatal problem".to_string(),
+                },
+            });
+        }
         return build_report(
             model::Verdict::InvalidInput,
             fatal,
@@ -93,6 +95,12 @@ pub fn analyze<S: PeriodicStructureView>(
     findings.extend(diagnostics::separation::check(structure));
     components.push(ComponentAssessment {
         name: ComponentName::SiteSeparation,
+        status: ComponentStatus::Ran,
+    });
+
+    findings.extend(diagnostics::disorder::check(structure));
+    components.push(ComponentAssessment {
+        name: ComponentName::Disorder,
         status: ComponentStatus::Ran,
     });
 
@@ -128,13 +136,15 @@ fn input_summary<S: PeriodicStructureView>(structure: &S) -> InputSummary {
     }
 }
 
+/// `Info`-severity findings (e.g. `DISORDER_PRESENT`) don't move the verdict
+/// off `StructurallyConsistent` on their own — AGENTS.md §7.7 is explicit
+/// that disorder is not itself an anomaly, and severity, not code identity,
+/// is what verdict decisions key on (AGENTS.md §9).
 fn decide_verdict(findings: &[Finding]) -> model::Verdict {
-    if findings.is_empty() {
-        model::Verdict::StructurallyConsistent
-    } else if findings.iter().any(|f| f.severity == Severity::Critical) {
-        model::Verdict::StrongAnomalyDetected
-    } else {
-        model::Verdict::ReviewRecommended
+    match findings.iter().map(|f| f.severity).max() {
+        None | Some(Severity::Info) => model::Verdict::StructurallyConsistent,
+        Some(Severity::Critical) => model::Verdict::StrongAnomalyDetected,
+        Some(_) => model::Verdict::ReviewRecommended,
     }
 }
 

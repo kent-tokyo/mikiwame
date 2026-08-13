@@ -36,6 +36,15 @@ pub enum FindingCode {
     /// numerical tolerance) under periodic boundary conditions.
     #[serde(rename = "SITE_DUPLICATE")]
     SiteDuplicate,
+    /// Two or more sites of different elements coincide under periodic
+    /// boundary conditions, modeled as positional disorder. Informational —
+    /// disorder is not itself an anomaly (AGENTS.md §7.7).
+    #[serde(rename = "DISORDER_PRESENT")]
+    DisorderPresent,
+    /// A disordered site group's occupancies sum to more than 1.0 — a site
+    /// cannot be more than fully occupied.
+    #[serde(rename = "DISORDER_OCCUPANCY_SUM_EXCEEDS_ONE")]
+    DisorderOccupancySumExceedsOne,
 }
 
 impl FindingCode {
@@ -49,6 +58,8 @@ impl FindingCode {
             Self::InputUnknownElement => "INPUT_UNKNOWN_ELEMENT",
             Self::LatticeSingular => "LATTICE_SINGULAR",
             Self::SiteDuplicate => "SITE_DUPLICATE",
+            Self::DisorderPresent => "DISORDER_PRESENT",
+            Self::DisorderOccupancySumExceedsOne => "DISORDER_OCCUPANCY_SUM_EXCEEDS_ONE",
         }
     }
 }
@@ -60,7 +71,7 @@ impl fmt::Display for FindingCode {
 }
 
 /// What part of the structure a [`Finding`] is about.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum FindingScope {
     /// The structure as a whole.
@@ -78,6 +89,12 @@ pub enum FindingScope {
         a: usize,
         /// Index of the second site.
         b: usize,
+    },
+    /// A group of more than two related sites, by index (e.g. a disorder
+    /// group of three or more coincident, differently-occupied sites).
+    SiteGroup {
+        /// Indices into the structure's site list.
+        indices: Vec<usize>,
     },
 }
 

@@ -75,7 +75,8 @@ the investigation and what would need to exist in `chematic` for a tighter integ
 
 ## Not yet implemented
 
-CIF/file I/O, coordination/distortion/composition/disorder diagnostics, and any
+CIF/file I/O, coordination/distortion/composition diagnostics (disorder's no-threshold
+subset — `DISORDER_PRESENT`, `DISORDER_OCCUPANCY_SUM_EXCEEDS_ONE` — has shipped), and any
 threshold-based check that would need an uncited constant (element radii, "extreme"
 lattice aspect ratio, oxidation-state tables). See [`tasks/todo.md`](tasks/todo.md).
 

@@ -193,17 +193,47 @@ fn coincident_same_element_sites_are_duplicates() {
 }
 
 #[test]
-fn coincident_different_element_sites_are_not_flagged_as_duplicates() {
-    // A Cl placed exactly where a Na sits looks like disorder (two species
-    // sharing a site), not a duplicate — must not fire SITE_DUPLICATE.
+fn coincident_different_element_sites_with_valid_occupancy_sum_are_disorder_not_duplicates() {
+    // A Cl placed exactly where a Na sits, each at half occupancy, is a
+    // textbook-valid disordered site (occupancies sum to 1.0) — must not
+    // fire SITE_DUPLICATE, and the occupancy sum being valid must not fire
+    // DISORDER_OCCUPANCY_SUM_EXCEEDS_ONE either. DISORDER_PRESENT is
+    // informational and must not move the verdict off StructurallyConsistent
+    // (AGENTS.md §7.7: disorder is not itself an anomaly).
     let mut sites = nacl_sites();
     sites[4].fractional = sites[0].fractional; // Cl onto Na
+    sites[0].occupancy = 0.5;
+    sites[4].occupancy = 0.5;
     let report = analyze(
         &OwnedStructure::new(nacl_lattice(), sites),
         &AnalysisConfig::default(),
     );
     assert_eq!(report.overall.verdict, Verdict::StructurallyConsistent);
-    assert!(report.findings.is_empty());
+    assert_eq!(
+        codes(&report.findings),
+        HashSet::from([FindingCode::DisorderPresent])
+    );
+}
+
+#[test]
+fn coincident_different_element_sites_with_full_occupancy_each_exceed_the_site() {
+    // Same coincident pair as above, but both left at full occupancy (as in
+    // the unmodified NaCl fixture): physically over-full, since occupancy
+    // sum needs no external threshold to know it can't exceed 1.0.
+    let mut sites = nacl_sites();
+    sites[4].fractional = sites[0].fractional; // Cl onto Na, both occupancy 1.0
+    let report = analyze(
+        &OwnedStructure::new(nacl_lattice(), sites),
+        &AnalysisConfig::default(),
+    );
+    assert_eq!(report.overall.verdict, Verdict::ReviewRecommended);
+    assert_eq!(
+        codes(&report.findings),
+        HashSet::from([
+            FindingCode::DisorderPresent,
+            FindingCode::DisorderOccupancySumExceedsOne,
+        ])
+    );
 }
 
 #[test]

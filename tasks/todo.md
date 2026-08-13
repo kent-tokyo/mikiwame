@@ -37,8 +37,12 @@
 - [ ] Phase 3: coordination number, local environment summary, `COORDINATION_*` codes.
 - [ ] Phase 3: polyhedral distortion (`POLYHEDRON_*` codes), ambiguous-environment handling.
 - [ ] Phase 4: composition/oxidation-state plausibility.
-- [ ] Phase 4: occupancy/disorder diagnostics beyond the input-quality sum/range checks
-      already in `diagnostics/input_quality.rs`.
+- [ ] Phase 4: remaining §7.7 disorder items beyond the no-threshold subset now shipped
+      (`DISORDER_PRESENT`, `DISORDER_OCCUPANCY_SUM_EXCEEDS_ONE` in `diagnostics/disorder.rs`)
+      — specifically "disorderによって距離診断が不確かになる場合" (lowering confidence of
+      *other* diagnostics near a disorder group). Nothing to discount yet: no
+      distance-based diagnostic beyond exact-coincidence detection exists to lower
+      confidence on. Revisit once one does, rather than inventing a discount factor now.
 - [ ] Phase 6: wurtzite, rutile, spinel, graphite fixtures — deferred from
       `tests/known_good_fixtures.rs` (which now covers CsCl, diamond, zinc blende,
       perovskite) because each needs at least one free internal positional parameter
@@ -80,3 +84,8 @@
 - [x] Phase 6 (partial): known-good fixtures for CsCl, diamond, zinc blende, and ideal
       perovskite in `tests/known_good_fixtures.rs`. See `fixtures/README.md` for why
       wurtzite/rutile/spinel/graphite are deferred instead.
+- [x] Phase 4 (partial, pulled forward): disorder no-threshold subset —
+      `DISORDER_PRESENT` (informational) and `DISORDER_OCCUPANCY_SUM_EXCEEDS_ONE` in
+      `diagnostics/disorder.rs`, reusing the PBC coincidence detection from
+      `separation.rs`. `decide_verdict` updated so `Info`-severity findings alone don't
+      move the verdict off `StructurallyConsistent`.

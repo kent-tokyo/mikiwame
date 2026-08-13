@@ -56,6 +56,8 @@ pub enum ComponentName {
     InputQuality,
     /// Site separation / duplicate-site checks (AGENTS.md §7.3, partial).
     SiteSeparation,
+    /// Occupancy and disorder checks (AGENTS.md §7.7, partial).
+    Disorder,
 }
 
 /// Whether a diagnostic component ran.
