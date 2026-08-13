@@ -12,7 +12,7 @@
 /// Disorder (multiple species sharing a position) is represented as multiple
 /// `Site`s with the same `fractional` coordinates and different `element`s —
 /// there is no dedicated multi-species site type in v0.1.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Site {
     /// Element symbol, e.g. `"Na"`. Not validated at construction — an
     /// unrecognized symbol is reported as `INPUT_UNKNOWN_ELEMENT` by

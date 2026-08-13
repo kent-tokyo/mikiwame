@@ -10,6 +10,20 @@ authors = ["kent-tokyo <kent-tokyo@users.noreply.github.com>"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", optional = true }
 
 [dev-dependencies]
 serde_json = "1"
+
+[features]
+default = ["cli"]
+# JSON (de)serialization needed only by the `mikiwame` binary — the library
+# itself never requires serde_json (AGENTS.md §19: keep optional-feature
+# dependency direction explicit). On by default since most installs of this
+# crate want the CLI; `default-features = false` gives a pure-library build.
+cli = ["dep:serde_json"]
+
+[[bin]]
+name = "mikiwame"
+path = "src/bin/mikiwame.rs"
+required-features = ["cli"]

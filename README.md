@@ -46,7 +46,25 @@ duplicated-site NaCl: StrongAnomalyDetected
 
 `analyze` takes anything implementing [`PeriodicStructureView`](src/structure_view.rs) —
 your own structure type, or [`OwnedStructure`](src/structure_view.rs) for direct
-construction. There is no CIF reader or CLI yet (see below).
+construction. There is no CIF reader yet (see below).
+
+## CLI
+
+```bash
+cargo run --bin mikiwame -- analyze structure.json --format markdown
+cargo run --bin mikiwame -- analyze structure.json --format json   # default
+cargo run --bin mikiwame -- batch structures.jsonl --output reports.jsonl
+cargo run --bin mikiwame -- explain report.json --finding SITE_DUPLICATE
+cargo run --bin mikiwame -- doctor
+```
+
+`structure.json` (and each line of `structures.jsonl`) is `{"lattice": [[..],[..],[..]],
+"sites": [{"element": "Na", "fractional": [0.0,0.0,0.0], "occupancy": 1.0}, ...]}` — see
+[`src/bin/mikiwame.rs`](src/bin/mikiwame.rs)'s module doc comment. This is a CLI-local
+schema, independent of the report's `schema_version`; there is no CIF reader yet, so this
+is the only supported file input. The CLI lives behind the `cli` Cargo feature (on by
+default; `cargo build --no-default-features` gives a pure-library build without pulling
+in `serde_json`).
 
 ## Relationship to `chematic`
 
@@ -57,10 +75,9 @@ the investigation and what would need to exist in `chematic` for a tighter integ
 
 ## Not yet implemented
 
-CIF/file I/O, the CLI (`analyze`/`batch`/`explain`/`doctor`), coordination/distortion/
-composition/disorder diagnostics, and any threshold-based check that would need an
-uncited constant (element radii, "extreme" lattice aspect ratio, oxidation-state
-tables). See [`tasks/todo.md`](tasks/todo.md).
+CIF/file I/O, coordination/distortion/composition/disorder diagnostics, and any
+threshold-based check that would need an uncited constant (element radii, "extreme"
+lattice aspect ratio, oxidation-state tables). See [`tasks/todo.md`](tasks/todo.md).
 
 ## Quality gate
 

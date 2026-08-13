@@ -39,13 +39,16 @@
 - [ ] Phase 4: composition/oxidation-state plausibility.
 - [ ] Phase 4: occupancy/disorder diagnostics beyond the input-quality sum/range checks
       already in `diagnostics/input_quality.rs`.
-- [ ] Phase 5: CLI (`analyze`, `batch`, `explain`, `doctor`), `src/bin/mikiwame.rs` is
-      not yet created.
-- [ ] Phase 6: known-good fixture set beyond the single NaCl-style fixture in `tests/`,
-      metamorphic tests (rotation/translation/permutation/supercell invariance),
-      differential comparison against pymatgen/spglib (no Python materials stack is
-      installed in the dev environment used so far — see `docs/validation.md`), benchmark
-      report.
+- [ ] Phase 6: known-good fixture set beyond the single NaCl-style fixture in `tests/`.
+- [ ] Phase 6: metamorphic tests (rotation/translation/permutation/supercell invariance).
+- [ ] Phase 6: differential comparison against pymatgen/spglib (no Python materials
+      stack is installed in the dev environment used so far — see `docs/validation.md`),
+      benchmark report.
+- [ ] CLI follow-ups (not blocking, all Green when picked up): `mikiwame batch` fails the
+      whole run on the first malformed JSONL line instead of reporting per-line and
+      continuing; exit codes are currently just 0 (ran) / 1 (usage or I/O error) and don't
+      reflect `Verdict` (e.g. for CI gating on `StrongAnomalyDetected`) — that's a product
+      decision AGENTS.md doesn't specify, left alone rather than guessed at.
 - [ ] Phase 7: release checklist, docs.rs/crates.io checks, semver audit.
 
 ## Done this round
@@ -64,3 +67,7 @@
 - [x] `INPUT_UNKNOWN_ELEMENT`: `Site::element` checked against the 118 IUPAC element
       symbols (plain enumerable fact, not a measured constant — no citation needed unlike
       the radius/oxidation tables above). Non-fatal, same reasoning as invalid occupancy.
+- [x] Phase 5: CLI (`analyze`/`batch`/`explain`/`doctor`) in `src/bin/mikiwame.rs`, behind
+      a `cli` Cargo feature (on by default) so the library itself never requires
+      `serde_json`. JSON structure-file schema documented in that file's module doc
+      comment and in `README.md`.
