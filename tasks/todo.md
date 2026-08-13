@@ -39,8 +39,11 @@
 - [ ] Phase 4: composition/oxidation-state plausibility.
 - [ ] Phase 4: occupancy/disorder diagnostics beyond the input-quality sum/range checks
       already in `diagnostics/input_quality.rs`.
-- [ ] Phase 6: known-good fixture set beyond the single NaCl-style fixture in `tests/`.
-- [ ] Phase 6: metamorphic tests (rotation/translation/permutation/supercell invariance).
+- [ ] Phase 6: known-good fixture set beyond the single NaCl-style fixture in `tests/`
+      (CsCl, diamond, zinc blende, wurtzite, rutile, perovskite, spinel, graphite per
+      AGENTS.md §15.1). Lower priority than it looks — see `docs/validation.md`: no
+      currently-shipped diagnostic inspects real bond distances, so more known-good
+      fixtures wouldn't exercise any new code path until Phase 3 lands.
 - [ ] Phase 6: differential comparison against pymatgen/spglib (no Python materials
       stack is installed in the dev environment used so far — see `docs/validation.md`),
       benchmark report.
@@ -71,3 +74,6 @@
       a `cli` Cargo feature (on by default) so the library itself never requires
       `serde_json`. JSON structure-file schema documented in that file's module doc
       comment and in `README.md`.
+- [x] Phase 6 (partial): metamorphic/invariance tests in `tests/metamorphic.rs` — site
+      order, origin shift, out-of-range fractional coordinates, lattice rotation, and
+      supercell invariance. See `docs/validation.md`.

@@ -27,13 +27,37 @@ verified, not just asserted in prose. Affects `SITE_DUPLICATE` (and any future
 distance-based check) only for structures with strongly skewed/acute cells; the shipped
 NaCl fixture and any orthogonal-ish cell are unaffected.
 
+## Metamorphic / invariance (`tests/metamorphic.rs`, AGENTS.md §15.3)
+
+`analyze`'s verdict and finding-code counts (site indices inside findings are allowed to
+differ, and do — documented in the test file's module comment, not silently) are checked
+invariant under:
+
+* site order (reversing the site list),
+* choice of origin (shifting every fractional coordinate by a fixed vector, mod 1),
+* fractional coordinates left outside `[0,1)` instead of pre-wrapped (`+3.0`/`-2.0`/`+1.0`
+  offsets on one site) — this one is a direct consequence of `minimum_image_distance`'s
+  wrap being translation-equivariant (`round(f+n) = round(f)+n` for integer `n`), so it
+  doubles as a second, independent check on that function beyond the closed-form tests
+  above,
+* rigid rotation of the lattice (a 90°, floating-point-exact rotation about `z`, fractional
+  coordinates unchanged),
+* describing the same physical structure as a 2×1×1 supercell (16 sites instead of 8) —
+  stays `StructurallyConsistent` with zero findings, i.e. supercelling a clean structure
+  does not manufacture spurious `SITE_DUPLICATE`s.
+
+Each check runs against a deliberately-broken variant (one duplicate pair, one invalid
+occupancy) where that makes the invariance non-trivial, not just the clean fixture.
+
 ## Not yet done
 
 * Differential comparison against pymatgen/spglib (AGENTS.md §15.4) — no Python
   materials-science stack is installed in the dev environment used so far. Not attempted
   via a scratch `pip install`, since that would modify the environment beyond this repo
   without being asked to.
-* Known-good fixture set beyond the single NaCl structure (AGENTS.md §15.1).
-* Metamorphic tests (rotation/translation/permutation/supercell invariance, AGENTS.md
-  §15.3).
+* Known-good fixture set beyond the single NaCl structure (AGENTS.md §15.1) — lower
+  priority than it looks: none of the currently-implemented diagnostics inspect real bond
+  distances/coordination (only exact same-position-same-element coincidence), so
+  additional "known-good" structures wouldn't exercise any new code path yet. Mainly
+  valuable once Phase 3 (coordination/distortion) lands.
 * Benchmark report (AGENTS.md §16) — no throughput/memory numbers have been measured.
