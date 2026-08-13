@@ -1,5 +1,7 @@
 # mikiwame (見極め)
 
+[English](README.md)
+
 周期結晶構造のためのExplainable(説明可能な)材料構造診断ライブラリ（Rust製）。
 
 `mikiwame`は3次元周期結晶構造を受け取り、単一の不透明なスコアではなく、**何が**構造的に

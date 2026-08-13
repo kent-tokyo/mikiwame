@@ -1,5 +1,7 @@
 # mikiwame (見極め)
 
+[日本語](README_ja.md)
+
 Explainable materials structure diagnostics for periodic crystal structures, in Rust.
 
 `mikiwame` looks at a 3D periodic crystal structure and explains **what** is
