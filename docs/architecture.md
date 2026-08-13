@@ -16,6 +16,8 @@ src/
 ├── finding.rs             Finding, FindingCode, FindingScope, Evidence
 ├── report.rs              MaterialDiagnosticReport and its component types
 ├── provenance.rs          Provenance (versions, config digest, timestamps caller-supplied)
+├── radii.rs               Cordero et al. 2008 covalent radius table (private; not yet
+│                          consumed by any diagnostic — see docs/validation.md)
 ├── structure_view.rs      PeriodicStructureView trait + OwnedStructure DTO (see chematic-prerequisites.md)
 └── diagnostics/
     ├── mod.rs             component pipeline: input_quality, then (if not fatal) separation, disorder

@@ -54,8 +54,13 @@ constant's source is recorded in provenance. Implemented in this phase:
 Deferred to a later phase because they need a cited, versioned reference table before
 they can carry a threshold honestly:
 
-* `SITE_SEVERE_OVERLAP` / `SITE_UNUSUALLY_SHORT_DISTANCE` — needs an elemental-radius
-  table with a recorded source/version (AGENTS.md §7.3).
+* `SITE_SEVERE_OVERLAP` / `SITE_UNUSUALLY_SHORT_DISTANCE` (AGENTS.md §7.3) — the
+  elemental-radius table itself is now sourced and versioned (Cordero et al. 2008,
+  `src/radii.rs`), but the table alone turned out not to be enough: a naive
+  `observed < covalent_radius_sum` comparison false-positives on ionic bonding
+  (demonstrated against the shipped perovskite fixture — see `docs/validation.md`).
+  Blocked on a second, separate decision now: either oxidation-state-aware ionic radii
+  (Phase 4) or a species-independent absolute-distance floor with its own citable basis.
 * `LATTICE_EXTREME_ASPECT_RATIO` / `LATTICE_POORLY_CONDITIONED` — "extreme" needs a
   documented criterion, not a guessed cutoff.
 * Coordination, distortion, composition/oxidation-state diagnostics — Phase 3/4, each

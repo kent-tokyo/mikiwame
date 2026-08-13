@@ -32,6 +32,7 @@ pub mod error;
 pub mod finding;
 pub mod model;
 pub mod provenance;
+mod radii;
 pub mod report;
 pub mod structure_view;
 

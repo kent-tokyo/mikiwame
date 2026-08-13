@@ -5,17 +5,24 @@
 - [ ] Review `docs/chematic-prerequisites.md` and decide whether/when to open the
       `chematic` PR for `Lattice`/`PeriodicStructure`/periodic-neighbor-search/occupancy
       CIF reading. Not started; separate repo/PR per AGENTS.md §4.
-- [ ] Decide the source for an elemental radius table, needed for `SITE_SEVERE_OVERLAP` /
-      `SITE_UNUSUALLY_SHORT_DISTANCE` (AGENTS.md §7.3). Candidate: Cordero et al.,
-      *Covalent radii revisited*, Dalton Trans. 2008, 2832–2838 — the table used (cited or
-      re-derived) by ASE (`ase.data.covalent_radii`), pymatgen, and most other open-source
-      chem/materials tools under permissive licenses. Not implemented here: AGENTS.md §22
-      lists "利用候補データのライセンス/再配布条件が不明" as a stop-and-report condition,
-      and embedding ~90 numeric values from memory or an unverified fetch is exactly the
-      kind of "plausible-sounding" data §21 warns against without an owner-reviewed source.
 
 ## Needs a cited source before implementation (do not guess thresholds)
 
+- [ ] `SITE_SEVERE_OVERLAP` / `SITE_UNUSUALLY_SHORT_DISTANCE` (AGENTS.md §7.3). The radius
+      table itself is resolved (Cordero et al. 2008, `src/radii.rs`), but embedding it
+      surfaced a narrower, separate problem: `observed_distance < covalent_radius_sum`
+      false-positives on ionic bonding, demonstrated against the already-shipped perovskite
+      fixture (Ti–O in SrTiO3, 1.9525 Å observed vs. 2.26 Å covalent-radii sum — a normal
+      bond flagged as "unusually short"). See `docs/validation.md` for the full table
+      (diamond/zinc-blende are fine; perovskite isn't) and
+      `radii::tests::expected_distance_from_covalent_radii_is_unsafe_for_ionic_bonds`.
+      Two paths forward, either needing its own owner decision:
+      (a) oxidation-state-aware ionic radii — depends on the oxidation-state table below
+      plus composition analysis (Phase 4), or
+      (b) a species-independent absolute-distance floor ("no two nuclei can be closer than
+      X regardless of element") — a different, narrower claim than "shorter than expected
+      for these two elements," needing its own citable basis rather than an arbitrary
+      fraction of the covalent-radii sum.
 - [ ] Documented criterion for "extreme" lattice aspect ratio / poor conditioning
       (`LATTICE_EXTREME_ASPECT_RATIO`, `LATTICE_POORLY_CONDITIONED`) — currently only
       `LATTICE_SINGULAR` (volume ≤ 0 or numerically singular) is implemented, since that
@@ -95,3 +102,8 @@
       if every line in the file is unparseable.
 - [x] `README_ja.md` added (translation, not a design decision — was only deferred for
       that reason, per `docs/architecture.md`).
+- [x] Elemental radius table decided and embedded: Cordero et al. 2008, `src/radii.rs`
+      (Z=1–96, values cross-checked against MolSSI QCElemental's transcription,
+      hybridization/spin-state disambiguation documented in the module doc comment).
+      Not wired into any diagnostic yet — see the new blocker above this table replaced
+      ("Needs a cited source" section) and `docs/validation.md`.

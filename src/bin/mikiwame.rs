@@ -189,7 +189,9 @@ fn cmd_doctor() {
     );
     println!("enabled features: none");
     println!(
-        "radius table version: none (SITE_SEVERE_OVERLAP / SITE_UNUSUALLY_SHORT_DISTANCE not implemented; see tasks/todo.md)"
+        "radius table: cordero-2008-table2 embedded, but not yet used by any diagnostic \
+         (SITE_SEVERE_OVERLAP / SITE_UNUSUALLY_SHORT_DISTANCE not implemented; \
+         see docs/validation.md for why the table alone is unsafe for that check, and tasks/todo.md)"
     );
     println!("oxidation-state table version: none (composition diagnostics not implemented)");
     println!("configured corpus: none");

@@ -49,6 +49,39 @@ invariant under:
 Each check runs against a deliberately-broken variant (one duplicate pair, one invalid
 occupancy) where that makes the invariance non-trivial, not just the clean fixture.
 
+## Covalent radii are not a safe "expected distance" for ionic bonding
+
+The elemental radius table decision (`tasks/todo.md`, resolved: Cordero et al. 2008,
+embedded in `src/radii.rs`) was originally motivated by `SITE_SEVERE_OVERLAP` /
+`SITE_UNUSUALLY_SHORT_DISTANCE` (AGENTS.md §7.3). Before implementing either, checking the
+table against the already-shipped perovskite fixture
+(`tests/known_good_fixtures.rs::perovskite_is_structurally_consistent`) turned up a false
+positive:
+
+| pair (fixture)        | observed distance | sum of Cordero covalent radii | naive verdict |
+|------------------------|-------------------:|-------------------------------:|----------------|
+| C–C (diamond)          | 1.544 Å             | 0.76 + 0.76 = 1.52 Å            | not flagged (correct) |
+| Zn–S (zinc blende)     | 2.343 Å             | 1.22 + 1.05 = 2.27 Å            | not flagged (correct) |
+| Ti–O (ideal perovskite)| 1.9525 Å            | 1.60 + 0.66 = 2.26 Å            | **flagged as "unusually short"** — wrong |
+
+Ti–O at 1.9525 Å in cubic SrTiO3 is a textbook-normal bond, not an anomaly. Covalent radii
+are additive estimates of *covalent* single-bond length and track the covalently-bonded
+fixtures well; they systematically overestimate expected separation for ionic bonding,
+where the relevant length scale is closer to (charge-state-dependent) ionic radii, not
+neutral-atom covalent radii. Most inorganic crystals mikiwame targets are at least partly
+ionic, so `observed_distance < covalent_radius_sum` is not a safe general-purpose
+"shorter than expected" test. This is pinned as
+`radii::tests::expected_distance_from_covalent_radii_is_unsafe_for_ionic_bonds` so it
+can't silently regress into being re-implemented.
+
+Consequence: the radius table itself is embedded (source, coverage, and disambiguation
+choices documented in `src/radii.rs`), but `SITE_SEVERE_OVERLAP` /
+`SITE_UNUSUALLY_SHORT_DISTANCE` remain unimplemented. Doing this correctly needs either
+oxidation-state-aware ionic radii (which needs the still-parked oxidation-state table plus
+composition analysis — Phase 4) or a species-independent absolute-floor check with its own
+citable basis (a different, narrower claim than "shorter than expected for these two
+elements"). See `tasks/todo.md`.
+
 ## Not yet done
 
 * Differential comparison against pymatgen/spglib (AGENTS.md §15.4) — no Python

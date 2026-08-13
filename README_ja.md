@@ -76,8 +76,11 @@ CLIは`cli` Cargo feature（デフォルトで有効）の裏にあります。`
 
 CIF/ファイルI/O、配位環境・歪み・組成の診断（disorderのしきい値不要サブセットである
 `DISORDER_PRESENT`、`DISORDER_OCCUPANCY_SUM_EXCEEDS_ONE`は実装済み）、および根拠のない
-定数を必要とするしきい値ベースの診断（元素半径、"極端な"格子アスペクト比、酸化数テーブル
-など）。詳細は[`tasks/todo.md`](tasks/todo.md)を参照してください。
+定数を必要とするしきい値ベースの診断（"極端な"格子アスペクト比、酸化数テーブルなど）。
+共有結合半径（Cordero et al. 2008）は出典を確認の上で埋め込み済みですが、まだどの診断
+にも接続していません — `SITE_SEVERE_OVERLAP`/`SITE_UNUSUALLY_SHORT_DISTANCE`の実装には
+別の判断がもう一つ必要です。理由は[`docs/validation.md`](docs/validation.md)を参照して
+ください。詳細は[`tasks/todo.md`](tasks/todo.md)を参照してください。
 
 ## 品質ゲート
 
