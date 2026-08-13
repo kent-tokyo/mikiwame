@@ -51,11 +51,11 @@
 - [ ] Phase 6: differential comparison against pymatgen/spglib (no Python materials
       stack is installed in the dev environment used so far — see `docs/validation.md`),
       benchmark report.
-- [ ] CLI follow-ups (not blocking, all Green when picked up): `mikiwame batch` fails the
-      whole run on the first malformed JSONL line instead of reporting per-line and
-      continuing; exit codes are currently just 0 (ran) / 1 (usage or I/O error) and don't
-      reflect `Verdict` (e.g. for CI gating on `StrongAnomalyDetected`) — that's a product
-      decision AGENTS.md doesn't specify, left alone rather than guessed at.
+- [ ] CLI exit codes are currently just 0 (ran) / 1 (usage or I/O error) and don't reflect
+      `Verdict` (e.g. for CI gating on `StrongAnomalyDetected`). Left alone rather than
+      guessed at: that's a genuine product decision (different callers would want
+      different behavior) AGENTS.md doesn't specify, unlike `batch`'s per-line parse
+      handling (fixed — see "Done this round").
 - [ ] Phase 7: release checklist, docs.rs/crates.io checks, semver audit.
 
 ## Done this round
@@ -89,3 +89,7 @@
       `diagnostics/disorder.rs`, reusing the PBC coincidence detection from
       `separation.rs`. `decide_verdict` updated so `Info`-severity findings alone don't
       move the verdict off `StructurallyConsistent`.
+- [x] `mikiwame batch` no longer aborts the whole run on one malformed JSONL line — skips
+      it with a warning to stderr and a final skipped-count summary, matching
+      `analyze_batch`'s own per-structure guarantee extended to file parsing. Fails only
+      if every line in the file is unparseable.

@@ -103,15 +103,30 @@ fn cmd_batch(args: &[String]) -> Result<(), String> {
     let output = flag(args, "--output").ok_or("batch requires --output <path>")?;
 
     let text = fs::read_to_string(path).map_err(|e| format!("reading {path}: {e}"))?;
-    let structures = text
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-        .map(|line| {
-            let file: StructureFile =
-                serde_json::from_str(line).map_err(|e| format!("parsing {path}: {e}"))?;
-            Ok(OwnedStructure::new(file.lattice, file.sites))
-        })
-        .collect::<Result<Vec<_>, String>>()?;
+    let mut structures = Vec::new();
+    let mut skipped = 0usize;
+    for (index, line) in text.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        match serde_json::from_str::<StructureFile>(line) {
+            Ok(file) => structures.push(OwnedStructure::new(file.lattice, file.sites)),
+            Err(e) => {
+                // A malformed line is a file-format problem local to that
+                // line, not a structure mikiwame could analyze — skip it
+                // rather than aborting the rest of a potentially large
+                // batch, same spirit as analyze_batch not letting one
+                // structure's result affect another's.
+                eprintln!("warning: {path} line {}: {e}, skipping", index + 1);
+                skipped += 1;
+            }
+        }
+    }
+    if structures.is_empty() && skipped > 0 {
+        return Err(format!(
+            "no valid structures found in {path} ({skipped} line(s) skipped)"
+        ));
+    }
 
     let reports = analyze_batch(&structures, &AnalysisConfig::default());
     let mut out = String::new();
@@ -120,7 +135,14 @@ fn cmd_batch(args: &[String]) -> Result<(), String> {
         out.push('\n');
     }
     fs::write(output, out).map_err(|e| format!("writing {output}: {e}"))?;
-    println!("wrote {} report(s) to {output}", reports.len());
+    if skipped > 0 {
+        println!(
+            "wrote {} report(s) to {output} ({skipped} line(s) skipped, see warnings above)",
+            reports.len()
+        );
+    } else {
+        println!("wrote {} report(s) to {output}", reports.len());
+    }
     Ok(())
 }
 
