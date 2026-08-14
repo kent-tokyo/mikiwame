@@ -4,6 +4,29 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-15
+
+### Added
+
+- `Cargo.toml` `categories`/`keywords` for crates.io discoverability:
+  `science::materials`, `science::computational-chemistry`, `command-line-utilities`;
+  `crystallography`, `materials-science`, `crystal-structure`, `diagnostics`,
+  `cheminformatics`.
+- `scripts/differential_validation.py`: an end-to-end differential check of
+  coordination number against pymatgen's `CrystalNN`. Rebuilds and runs the actual
+  `mikiwame` CLI as a subprocess (not a hand-maintained expected-value table) on the 5
+  known-good fixtures; exact agreement on all 31 sites as of writing. Not wired into
+  `cargo test`/CI — a manually-reproduced Python check, see the script's own header and
+  `docs/validation.md` for setup and results.
+
+### Fixed
+
+- `SiteLocalEnvironment`'s doc comment (`src/report.rs`) referenced
+  `FindingCode::CoordinationAmbiguous`, which had been drafted and then removed before
+  0.2.0 shipped — the comment was never updated to match.
+- README.md/README_ja.md's "Status: v0.1" line reworded — it read as a version-number
+  claim conflicting with the crate shipping as 0.2.0.
+
 ## [0.2.0] - 2026-08-14
 
 ### Added
