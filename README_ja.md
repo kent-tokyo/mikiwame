@@ -72,20 +72,26 @@ CLIは`cli` Cargo feature（デフォルトで有効）の裏にあります。`
 公開の入力境界は今も自前の最小限の読み取り専用トレイト`PeriodicStructureView`です —
 これは暫定措置ではなく意図的な選択です。`chematic-crystal`の型は構築時に不正な入力を
 検証・拒否しますが、mikiwameの前提は不正な構造を「拒否」ではなく「診断」することに
-あります。一方、内部的には周期境界条件の幾何計算(厳密な最小image距離)のために
-[`chematic-crystal`](https://crates.io/crates/chematic-crystal)に依存するようになり
-ました。詳しい経緯は
+あります。一方、内部的には周期境界条件の幾何計算(厳密な最小image距離、周期的近傍探索)の
+ために[`chematic-crystal`](https://crates.io/crates/chematic-crystal)に依存するように
+なりました。詳しい経緯は
 [`docs/chematic-prerequisites.md`](docs/chematic-prerequisites.md)を参照してください。
 
 ## 未実装
 
-CIF/ファイルI/O、配位環境・歪み・組成の診断（disorderのしきい値不要サブセットである
-`DISORDER_PRESENT`、`DISORDER_OCCUPANCY_SUM_EXCEEDS_ONE`は実装済み）、および根拠のない
-定数を必要とするしきい値ベースの診断（"極端な"格子アスペクト比、酸化数テーブルなど）。
-共有結合半径（Cordero et al. 2008）は出典を確認の上で埋め込み済みですが、まだどの診断
-にも接続していません — `SITE_SEVERE_OVERLAP`/`SITE_UNUSUALLY_SHORT_DISTANCE`の実装には
-別の判断がもう一つ必要です。理由は[`docs/validation.md`](docs/validation.md)を参照して
-ください。詳細は[`tasks/todo.md`](tasks/todo.md)を参照してください。
+CIF/ファイルI/O(上流の`chematic-mol`側のCIF readerがまだ無く、そちらに依存 —
+CIF基盤をmikiwame内で重複実装しない方針は[`AGENTS.md`](AGENTS.md)参照)、多面体歪み・
+組成/酸化数の診断、および根拠のない定数を必要とするしきい値ベースの診断("極端な"格子
+アスペクト比、酸化数テーブルなど)。
+
+disorderのしきい値不要サブセット(`DISORDER_PRESENT`、`DISORDER_OCCUPANCY_SUM_EXCEEDS_ONE`)
+と、配位数・局所環境診断(`MaterialDiagnosticReport::local_environment`、AGENTS.md §7.4 —
+共有結合半径(Cordero et al. 2008)で近傍探索の範囲を絞り、実際のシェル境界は候補距離列
+中の最大相対ギャップで決定。詳細は[`docs/scientific_scope.md`](docs/scientific_scope.md))
+はいずれも実装済みです。`SITE_SEVERE_OVERLAP`/`SITE_UNUSUALLY_SHORT_DISTANCE`は半径表だけ
+では不十分で、別の判断がもう一つ必要です。理由は
+[`docs/validation.md`](docs/validation.md)を参照してください。詳細は
+[`tasks/todo.md`](tasks/todo.md)を参照してください。
 
 ## 品質ゲート
 

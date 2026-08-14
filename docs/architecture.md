@@ -16,19 +16,27 @@ src/
 ├── finding.rs             Finding, FindingCode, FindingScope, Evidence
 ├── report.rs              MaterialDiagnosticReport and its component types
 ├── provenance.rs          Provenance (versions, config digest, timestamps caller-supplied)
-├── radii.rs               Cordero et al. 2008 covalent radius table (private; not yet
-│                          consumed by any diagnostic — see docs/validation.md)
-├── structure_view.rs      PeriodicStructureView trait + OwnedStructure DTO (see chematic-prerequisites.md)
+├── radii.rs               Cordero et al. 2008 covalent radius table (private; consumed by
+│                          diagnostics::coordination, its first real caller)
+├── structure_view.rs      PeriodicStructureView trait + OwnedStructure DTO (see chematic-prerequisites.md);
+│                          also the shared coincidence_groups() helper (disorder + coordination)
 └── diagnostics/
-    ├── mod.rs             component pipeline: input_quality, then (if not fatal) separation, disorder
+    ├── mod.rs             component pipeline: input_quality, then (if not fatal) separation,
+    │                      disorder, coordination
     ├── input_quality.rs   Phase 2, no-threshold checks — this is where LATTICE_SINGULAR lives too:
     │                      AGENTS.md §7.1 lists "singular/near-singular lattice" and "non-positive
     │                      cell volume" as *input quality* checks, not §7.2 geometry checks
     ├── separation.rs      Phase 2, no-threshold checks (exact-duplicate sites under PBC)
-    └── disorder.rs        Phase 4 (pulled forward), no-threshold subset of §7.7: coincident
-                           different-element sites (DISORDER_PRESENT, informational) and an
-                           occupancy-sum-exceeds-one check reusing the same PBC coincidence
-                           detection as separation.rs
+    ├── disorder.rs        Phase 4 (pulled forward), no-threshold subset of §7.7: coincident
+    │                      different-element sites (DISORDER_PRESENT, informational) and an
+    │                      occupancy-sum-exceeds-one check reusing the same PBC coincidence
+    │                      detection as separation.rs
+    └── coordination.rs    Phase 3 (core): coordination number / local environment (AGENTS.md
+                           §7.4). Reports via MaterialDiagnosticReport::local_environment, not
+                           findings — see docs/validation.md and docs/scientific_scope.md for
+                           the method (covalent-radius-sum+tolerance outer bound, then
+                           largest-relative-gap shell resolution) and why the first alone isn't
+                           enough
 ```
 
 `lattice.rs` (§7.2: aspect ratio, angles, conditioning) is not created yet — every check
@@ -36,12 +44,15 @@ listed there needs an "extreme"/"poorly conditioned" cutoff, i.e. an invented th
 which AGENTS.md §21 forbids without a citable basis. It will be added once such a basis
 exists (see `tasks/todo.md`).
 
-`coordination.rs`, `distortion.rs`, `composition.rs` are Phase 3/4 work, not present yet —
-adding empty stubs now would be scaffolding-for-later, which AGENTS.md §21 and ponytail
-both rule out. `disorder.rs` jumped the nominal phase order ahead of Phase 3
-(coordination/distortion) because its one no-threshold check (occupancy-sum) has no
-dependency on anything Phase 3 would add — it only needed the PBC coincidence detection
-`separation.rs` already had.
+`distortion.rs`, `composition.rs` are Phase 3/4 work, not present yet — adding empty stubs
+now would be scaffolding-for-later, which AGENTS.md §21 and ponytail both rule out.
+`disorder.rs` jumped the nominal phase order ahead of Phase 3 (coordination/distortion)
+because its one no-threshold check (occupancy-sum) had no dependency on anything Phase 3
+would add — it only needed the PBC coincidence detection `separation.rs` already had.
+`coordination.rs` landed after `disorder.rs` for the opposite reason: it specifically
+needed `chematic_crystal`'s neighbor search (only available once the chematic-crystal
+integration round shipped) and reuses `disorder.rs`'s coincidence grouping (moved to
+`structure_view.rs` to be shared) to build multi-species positions correctly.
 
 ## Data flow
 
@@ -52,11 +63,12 @@ caller's structure (impl PeriodicStructureView)
    input_quality::check()  ──▶ if fatal: short-circuit, Verdict::InvalidInput
         │  ok
         ▼
-   separation::check(), disorder::check()  (independent components; more join here later)
-        │
+   separation::check(), disorder::check(), coordination::check()
+        │  (independent components; more join here later)
         ▼
    aggregate findings ──▶ OverallAssessment (verdict, dominant findings)
-        │
+   coordination's local_environment ──▶ MaterialDiagnosticReport::local_environment directly
+        │  (descriptive, not a finding — see docs/scientific_scope.md)
         ▼
    MaterialDiagnosticReport
 ```
@@ -104,9 +116,9 @@ only reported as `None`/absent.
 
 ## Deferred (named, not built)
 
-* `coordination`/`distortion`/`composition` diagnostics — Phase 3/4. `disorder`'s
-  no-threshold subset shipped early; see the module layout section above.
-* CLI (`src/bin/mikiwame.rs`) — Phase 5.
+* `distortion`/`composition` diagnostics — Phase 3/4. `disorder`'s no-threshold subset and
+  `coordination`'s core both shipped early; see the module layout section above.
+* CLI (`src/bin/mikiwame.rs`) — shipped, Phase 5; line kept only for the list's history.
 * Corpus/prototype similarity — optional, post-v0.1 per AGENTS.md §10.
 * `MikiwameHandoff` (gugen handoff type) — future, per AGENTS.md §18, not built now.
 * `mikiwame-cli` split — only if the CLI grows large enough to warrant it (AGENTS.md §12).

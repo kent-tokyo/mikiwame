@@ -19,11 +19,11 @@
 //! `DISORDER_OCCUPANCY_SUM_EXCEEDS_ONE`), which is a false negative with no
 //! finding to attach a lowered confidence to.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use crate::finding::{Evidence, Finding, FindingCode, FindingScope, NumericEvidence};
 use crate::model::{ClosedRange, MetricCode, Score01, Severity, Unit};
-use crate::structure_view::{PeriodicStructureView, minimum_image};
+use crate::structure_view::{PeriodicStructureView, coincidence_groups};
 
 // Numerical-identity tolerance (float round-trip noise), same value and
 // justification as separation::DUPLICATE_TOLERANCE_ANGSTROM. Kept as its own
@@ -34,65 +34,16 @@ fn certain() -> Score01 {
     Score01::new(1.0).expect("1.0 is a valid Score01")
 }
 
-fn find(parent: &mut [usize], x: usize) -> usize {
-    if parent[x] != x {
-        parent[x] = find(parent, parent[x]);
-    }
-    parent[x]
-}
-
-/// Groups of site indices that mutually coincide under PBC, by transitive
-/// closure over pairwise coincidence, plus a `Finding::limitations` entry if
-/// any pairwise distance behind that grouping used the approximate fallback
-/// (see `structure_view::minimum_image`). The fallback decision depends only
-/// on the structure's one shared lattice, not on which pair is being
-/// compared, so in practice every pair agrees — this just surfaces whichever
-/// one the loop happens to see.
-///
-/// ponytail: O(n^2) pairwise scan plus union-find; fine at v0.1's scale
-/// (matches separation::check's own O(n^2) scan), revisit if mikiwame is
-/// used on structures with many thousands of sites.
-fn coincidence_groups<S: PeriodicStructureView>(
-    structure: &S,
-) -> (Vec<Vec<usize>>, Option<String>) {
-    let lattice = structure.lattice();
-    let sites = structure.sites();
-    let n = sites.len();
-    let mut parent: Vec<usize> = (0..n).collect();
-    let mut fallback_limitation: Option<String> = None;
-
-    for i in 0..n {
-        for j in (i + 1)..n {
-            let distance = minimum_image(lattice, sites[i].fractional, sites[j].fractional);
-            if fallback_limitation.is_none() {
-                fallback_limitation = distance.method.limitation();
-            }
-            if distance.distance_angstrom < COINCIDENCE_TOLERANCE_ANGSTROM {
-                let (root_i, root_j) = (find(&mut parent, i), find(&mut parent, j));
-                if root_i != root_j {
-                    parent[root_i] = root_j;
-                }
-            }
-        }
-    }
-
-    let mut groups: HashMap<usize, Vec<usize>> = HashMap::new();
-    for i in 0..n {
-        let root = find(&mut parent, i);
-        groups.entry(root).or_default().push(i);
-    }
-    (
-        groups.into_values().filter(|g| g.len() > 1).collect(),
-        fallback_limitation,
-    )
-}
-
 pub(crate) fn check<S: PeriodicStructureView>(structure: &S) -> Vec<Finding> {
     let sites = structure.sites();
     let mut findings = Vec::new();
-    let (groups, fallback_limitation) = coincidence_groups(structure);
+    let (groups, fallback_limitation) =
+        coincidence_groups(structure, COINCIDENCE_TOLERANCE_ANGSTROM);
 
-    for group in groups {
+    // Singleton groups (an ordinary site with no coincidence partner) and
+    // same-element-only groups (separation::check's SITE_DUPLICATE, not
+    // disorder) aren't this component's concern.
+    for group in groups.into_iter().filter(|g| g.len() > 1) {
         let distinct_elements: HashSet<&str> =
             group.iter().map(|&i| sites[i].element.as_str()).collect();
         if distinct_elements.len() < 2 {

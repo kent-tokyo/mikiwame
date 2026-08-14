@@ -75,19 +75,25 @@ The public input boundary is still mikiwame's own minimal, read-only
 validate and reject malformed input at construction, while mikiwame's whole premise is
 diagnosing malformed input, not refusing it. Internally, though, `mikiwame` now depends
 on [`chematic-crystal`](https://crates.io/crates/chematic-crystal) for periodic-boundary
-geometry (exact minimum-image distance). See
+geometry (exact minimum-image distance, periodic neighbor search). See
 [`docs/chematic-prerequisites.md`](docs/chematic-prerequisites.md) for the full
 reasoning.
 
 ## Not yet implemented
 
-CIF/file I/O, coordination/distortion/composition diagnostics (disorder's no-threshold
-subset — `DISORDER_PRESENT`, `DISORDER_OCCUPANCY_SUM_EXCEEDS_ONE` — has shipped), and any
-threshold-based check that would need an uncited constant ("extreme" lattice aspect ratio,
-oxidation-state tables). Covalent radii (Cordero et al. 2008) are sourced and embedded but
-not yet wired into a check — `SITE_SEVERE_OVERLAP`/`SITE_UNUSUALLY_SHORT_DISTANCE` need a
-second, separate decision first; see [`docs/validation.md`](docs/validation.md) for why.
-See [`tasks/todo.md`](tasks/todo.md).
+CIF/file I/O (blocked on an upstream `chematic-mol` reader, not built here — see
+[`AGENTS.md`](AGENTS.md)'s stance on not reimplementing CIF infrastructure), polyhedral
+distortion, composition/oxidation-state diagnostics, and any threshold-based check that
+would need an uncited constant ("extreme" lattice aspect ratio, oxidation-state tables).
+
+Disorder's no-threshold subset (`DISORDER_PRESENT`, `DISORDER_OCCUPANCY_SUM_EXCEEDS_ONE`)
+and coordination number / local environment (`MaterialDiagnosticReport::local_environment`,
+AGENTS.md §7.4 — covalent radii from Cordero et al. 2008 bound the neighbor search, the
+actual shell resolved by the largest relative gap in candidate distances; see
+[`docs/scientific_scope.md`](docs/scientific_scope.md)) have both shipped.
+`SITE_SEVERE_OVERLAP`/`SITE_UNUSUALLY_SHORT_DISTANCE` still need a second, separate
+decision beyond the radius table alone; see [`docs/validation.md`](docs/validation.md) for
+why. See [`tasks/todo.md`](tasks/todo.md) for the full list.
 
 ## Quality gate
 

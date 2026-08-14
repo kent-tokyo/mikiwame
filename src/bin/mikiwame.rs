@@ -185,13 +185,20 @@ fn cmd_doctor() {
     println!("mikiwame version: {}", env!("CARGO_PKG_VERSION"));
     println!("schema version: {}", mikiwame::SCHEMA_VERSION);
     println!(
-        "chematic: not used (its default branch has no periodic-structure API yet; see docs/chematic-prerequisites.md)"
+        "chematic: chematic-crystal 0.15.0 (periodic geometry: minimum-image distance, \
+         neighbor search); PeriodicStructureView stays mikiwame's own input boundary — see \
+         docs/chematic-prerequisites.md"
     );
     println!("enabled features: none");
     println!(
-        "radius table: cordero-2008-table2 embedded, but not yet used by any diagnostic \
-         (SITE_SEVERE_OVERLAP / SITE_UNUSUALLY_SHORT_DISTANCE not implemented; \
-         see docs/validation.md for why the table alone is unsafe for that check, and tasks/todo.md)"
+        "radius table: cordero-2008-table2, used by the coordination component's neighbor \
+         cutoff; SITE_SEVERE_OVERLAP / SITE_UNUSUALLY_SHORT_DISTANCE still not implemented \
+         (see docs/validation.md for why the table alone is unsafe for that check, and tasks/todo.md)"
+    );
+    println!(
+        "coordination method: covalent-radius-sum-plus-tolerance(epsilon=0.4A), \
+         largest-relative-gap shell detection; reported via local_environment, not findings; \
+         polyhedral distortion (§7.5) not implemented"
     );
     println!("oxidation-state table version: none (composition diagnostics not implemented)");
     println!("configured corpus: none");
@@ -237,6 +244,36 @@ fn render_markdown(report: &MaterialDiagnosticReport) -> String {
                 finding.confidence.get(),
                 finding.explanation
             ));
+        }
+        out.push('\n');
+    }
+
+    if !report.local_environment.is_empty() {
+        out.push_str("## Local Environment\n\n");
+        for entry in &report.local_environment {
+            match entry.coordination_number {
+                Some(cn) => {
+                    let species = entry
+                        .neighbor_species
+                        .iter()
+                        .map(|s| format!("{} {}", s.count, s.element))
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    out.push_str(&format!("- site {}: CN={cn} ({species})", entry.site_index));
+                    if let Some(gap) = entry.shell_gap_ratio {
+                        out.push_str(&format!(", shell gap ratio {gap:.3}"));
+                    }
+                    out.push('\n');
+                }
+                None => out.push_str(&format!(
+                    "- site {}: not computed ({})\n",
+                    entry.site_index,
+                    entry
+                        .not_computed_reason
+                        .as_deref()
+                        .unwrap_or("no reason recorded")
+                )),
+            }
         }
         out.push('\n');
     }

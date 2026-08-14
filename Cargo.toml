@@ -1,6 +1,6 @@
 [package]
 name = "mikiwame"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
@@ -9,6 +9,7 @@ repository = "https://github.com/kent-tokyo/mikiwame"
 authors = ["kent-tokyo <kent-tokyo@users.noreply.github.com>"]
 
 [dependencies]
+chematic-core = "0.15.0"
 chematic-crystal = "0.15.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", optional = true }

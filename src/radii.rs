@@ -35,11 +35,8 @@
 //!   (e.g. Fe 1.32 Å).
 
 /// Identifies which table and disambiguation rules `covalent_radius_angstrom`
-/// uses, for provenance/`doctor` output once a diagnostic consumes this data.
-// ponytail: not read anywhere yet — no diagnostic consumes this table (see
-// module doc comment). Kept `pub(crate)` rather than deleted so the next
-// diagnostic that does consume it doesn't have to re-derive this string.
-#[allow(dead_code)]
+/// uses. Recorded in `Provenance::radius_table_version` by
+/// `diagnostics::coordination`, the first (and so far only) consumer.
 pub(crate) const RADIUS_TABLE_VERSION: &str = "cordero-2008-table2";
 
 #[rustfmt::skip]
@@ -70,9 +67,6 @@ const TABLE: &[(&str, f64)] = &[
 /// `None` if `symbol` isn't a recognized element or falls outside the
 /// paper's coverage (Z > 96). Never substitutes a default — see the module
 /// doc comment.
-// ponytail: only called from this module's own tests today — see
-// RADIUS_TABLE_VERSION's comment above.
-#[allow(dead_code)]
 pub(crate) fn covalent_radius_angstrom(symbol: &str) -> Option<f64> {
     TABLE
         .iter()

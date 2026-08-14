@@ -192,6 +192,63 @@ fn naive_minimum_image_distance(lattice: &[[f64; 3]; 3], a: [f64; 3], b: [f64; 3
     (cart[0] * cart[0] + cart[1] * cart[1] + cart[2] * cart[2]).sqrt()
 }
 
+fn union_find(parent: &mut [usize], x: usize) -> usize {
+    if parent[x] != x {
+        parent[x] = union_find(parent, parent[x]);
+    }
+    parent[x]
+}
+
+/// Every site index grouped with every other site index it exactly coincides
+/// with under PBC (numerical-identity tolerance, transitive closure), plus a
+/// `Finding::limitations`-ready note if any pairwise distance behind the
+/// grouping used [`minimum_image`]'s approximate fallback. Includes
+/// singleton groups (an ordinary site with no coincidence partner is its own
+/// one-element group) — callers that only care about actual coincidences
+/// (e.g. disorder detection) filter those out themselves; callers that need
+/// every site accounted for (e.g. building a whole-structure geometry
+/// object) do not have to special-case them.
+///
+/// Shared by `diagnostics::disorder` (same-tolerance duplicate/disorder
+/// detection) and `diagnostics::coordination` (grouping coincident sites
+/// into one multi-species position before neighbor search) rather than each
+/// re-implementing the same union-find scan.
+///
+/// ponytail: O(n^2) pairwise scan plus union-find; fine at v0.1's scale,
+/// revisit if mikiwame is used on structures with many thousands of sites.
+pub(crate) fn coincidence_groups<S: PeriodicStructureView>(
+    structure: &S,
+    tolerance_angstrom: f64,
+) -> (Vec<Vec<usize>>, Option<String>) {
+    let lattice = structure.lattice();
+    let sites = structure.sites();
+    let n = sites.len();
+    let mut parent: Vec<usize> = (0..n).collect();
+    let mut fallback_limitation: Option<String> = None;
+
+    for i in 0..n {
+        for j in (i + 1)..n {
+            let distance = minimum_image(lattice, sites[i].fractional, sites[j].fractional);
+            if fallback_limitation.is_none() {
+                fallback_limitation = distance.method.limitation();
+            }
+            if distance.distance_angstrom < tolerance_angstrom {
+                let (root_i, root_j) = (union_find(&mut parent, i), union_find(&mut parent, j));
+                if root_i != root_j {
+                    parent[root_i] = root_j;
+                }
+            }
+        }
+    }
+
+    let mut groups: std::collections::HashMap<usize, Vec<usize>> = std::collections::HashMap::new();
+    for i in 0..n {
+        let root = union_find(&mut parent, i);
+        groups.entry(root).or_default().push(i);
+    }
+    (groups.into_values().collect(), fallback_limitation)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -4,6 +4,34 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-14
+
+### Added
+
+- Coordination number / local environment (AGENTS.md §7.4):
+  `MaterialDiagnosticReport::local_environment`, one `SiteLocalEnvironment` per resolvable
+  site (coordination number, neighbor-species breakdown, shell gap ratio). Reported as
+  descriptive data, not findings — a coordination number isn't itself an anomaly. Method:
+  candidate neighbors bounded by covalent-radius-sum (Cordero et al. 2008) plus a
+  0.4 Å tolerance (Šidlauskaitė et al. 2026, arXiv:2601.02017; PackFlow 2025), then the
+  actual coordination shell resolved as the largest relative gap in the sorted
+  candidate-distance list — the radius-sum bound alone was hand-verified, before
+  implementation, to over-count CsCl (14 instead of 8) and perovskite's Ti (14 instead of
+  6); see `docs/validation.md`. Disordered (multi-species) positions and elements outside
+  Cordero's Z=1-96 coverage are skipped with a recorded reason.
+- `chematic-core` added as a direct dependency (`chematic_core::Element`, used to resolve
+  covalent radii by symbol for the coordination check above).
+
+### Changed
+
+- **Breaking**: `MaterialDiagnosticReport` gained a required `local_environment` field;
+  `SCHEMA_VERSION` bumped to `2`. A report serialized under schema `1` cannot be
+  deserialized as-is.
+- `structure_view`'s PBC-coincidence grouping (previously private to `diagnostics::disorder`)
+  is now `structure_view::coincidence_groups`, shared with `diagnostics::coordination`
+  (which uses it to merge disordered positions into one multi-species
+  `chematic_crystal::PeriodicSite` before neighbor search).
+
 ## [0.1.1] - 2026-08-14
 
 ### Changed

@@ -6,10 +6,13 @@
 //!
 //! # What this answers
 //!
-//! Input-quality problems, lattice/cell validity, and (as more diagnostic
-//! components land) coordination, distortion, composition, and disorder
-//! anomalies — each as a machine-readable [`finding::Finding`] with its own
-//! severity, confidence, and evidence.
+//! Input-quality problems, lattice/cell validity, disorder, and coordination
+//! number / local environment anomalies as machine-readable
+//! [`finding::Finding`]s, each with its own severity, confidence, and
+//! evidence. Descriptive (non-anomaly) per-site coordination data is
+//! reported separately via [`report::MaterialDiagnosticReport::local_environment`].
+//! Distortion and composition/oxidation-state checks are not implemented yet
+//! (see `tasks/todo.md`).
 //!
 //! # What this does not answer
 //!
@@ -76,7 +79,11 @@ pub fn analyze<S: PeriodicStructureView>(
     });
 
     if fatal {
-        for name in [ComponentName::SiteSeparation, ComponentName::Disorder] {
+        for name in [
+            ComponentName::SiteSeparation,
+            ComponentName::Disorder,
+            ComponentName::Coordination,
+        ] {
             components.push(ComponentAssessment {
                 name,
                 status: ComponentStatus::Skipped {
@@ -89,6 +96,8 @@ pub fn analyze<S: PeriodicStructureView>(
             fatal,
             findings,
             components,
+            Vec::new(),
+            None,
             input_summary(structure),
         );
     }
@@ -105,12 +114,35 @@ pub fn analyze<S: PeriodicStructureView>(
         status: ComponentStatus::Ran,
     });
 
+    let coordination_outcome = diagnostics::coordination::check(structure);
+    let coordination_method = match &coordination_outcome.skipped {
+        Some(reason) => {
+            components.push(ComponentAssessment {
+                name: ComponentName::Coordination,
+                status: ComponentStatus::Skipped {
+                    reason: reason.clone(),
+                },
+            });
+            None
+        }
+        None => {
+            components.push(ComponentAssessment {
+                name: ComponentName::Coordination,
+                status: ComponentStatus::Ran,
+            });
+            Some(diagnostics::coordination::method_description())
+        }
+    };
+    findings.extend(coordination_outcome.findings);
+
     let verdict = decide_verdict(&findings);
     build_report(
         verdict,
         fatal,
         findings,
         components,
+        coordination_outcome.local_environment,
+        coordination_method,
         input_summary(structure),
     )
 }
@@ -169,6 +201,8 @@ fn build_report(
     fatal: bool,
     findings: Vec<Finding>,
     components: Vec<ComponentAssessment>,
+    local_environment: Vec<report::SiteLocalEnvironment>,
+    coordination_method: Option<String>,
     input: InputSummary,
 ) -> MaterialDiagnosticReport {
     let dominant = dominant_findings(&findings);
@@ -190,6 +224,12 @@ fn build_report(
             reasons: Vec::new(),
         }
     };
+    // The radius table's only consumer today is the coordination component,
+    // so its version is reported exactly when that component ran (never a
+    // version number for a table nothing actually used).
+    let radius_table_version = coordination_method
+        .is_some()
+        .then(|| radii::RADIUS_TABLE_VERSION.to_string());
     MaterialDiagnosticReport {
         schema_version: SCHEMA_VERSION,
         input,
@@ -202,7 +242,8 @@ fn build_report(
         applicability,
         components,
         findings,
+        local_environment,
         suggestions: Vec::new(),
-        provenance: Provenance::current(),
+        provenance: Provenance::current(radius_table_version, coordination_method),
     }
 }

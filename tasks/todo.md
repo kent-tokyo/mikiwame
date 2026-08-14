@@ -29,8 +29,24 @@
       mikiwame's own threshold is still an owner decision (changes what's fatal), not
       done in this round.
 - [ ] Formal oxidation-state table (source + version) for §7.6 composition/charge checks.
-- [ ] Neighbor-definition method (name + cutoff rule + provenance) for §7.4 coordination.
 - [ ] Ideal-polyhedron reference set for §7.5 distortion metrics.
+- [ ] Ambiguity criterion for coordination number: `SiteLocalEnvironment::shell_gap_ratio` is
+      reported (a gap of exactly `1.0` is impossible by construction — see
+      `diagnostics::coordination::resolve_shell`'s doc comment — so `None` means "one clean
+      shell, nothing else nearby" and `Some(r)` means `r > 1.0` always), but nothing yet turns
+      a *small* `r` into a `FindingCode::CoordinationAmbiguous` finding or a lowered
+      confidence. An earlier attempt at this during the round that shipped coordination number
+      was found to be simply backwards (a bug caught by testing NaCl's fully-tied 6-neighbor
+      shell before trusting it — see `docs/validation.md`), and its replacement — a specific
+      "how close to 1.0 counts as ambiguous" cutoff — would itself be exactly the kind of
+      invented threshold AGENTS.md §21 forbids without a citable basis. Needs either a citation
+      for that cutoff or a different, threshold-free ambiguity signal.
+- [ ] CIF input: still blocked on chematic-mol's occupancy-aware CIF reader (referred to
+      earlier as "PR2" in the chematic-crystal integration sequence), which has not landed —
+      confirmed via `gh pr list --repo kent-tokyo/chematic` (only chematic-crystal's PR #318
+      and the v0.15.0 release PR exist as of the coordination-number round). AGENTS.md forbids
+      reimplementing CIF infrastructure inside mikiwame ("一般的なCIF基盤の重複実装" is listed
+      under "mikiwameに含めない"), so this stays parked rather than worked around.
 - [ ] Out-of-domain applicability detection (surfaces/interfaces/amorphous/polymers,
       AGENTS.md §5): `analyze` currently always reports `ApplicabilityLevel::FullyApplicable`
       for any input that passes input-quality checks. Parked here rather than implemented:
@@ -42,8 +58,11 @@
 
 ## Phase backlog (not started)
 
-- [ ] Phase 3: coordination number, local environment summary, `COORDINATION_*` codes.
-- [ ] Phase 3: polyhedral distortion (`POLYHEDRON_*` codes), ambiguous-environment handling.
+- [ ] Phase 3: polyhedral distortion (`POLYHEDRON_*` codes) — needs the ideal-polyhedron
+      reference set above. Coordination number / local environment shipped this round (see
+      "Done this round"), so "ambiguous-environment handling" here now means §7.5's
+      `AmbiguousCoordinationEnvironment` (shape recognition for distortion), a different
+      concern from the coordination-number ambiguity item above.
 - [ ] Phase 4: composition/oxidation-state plausibility.
 - [ ] Phase 4: remaining §7.7 disorder items beyond the no-threshold subset now shipped
       (`DISORDER_PRESENT`, `DISORDER_OCCUPANCY_SUM_EXCEEDS_ONE` in `diagnostics/disorder.rs`)
@@ -139,3 +158,22 @@
       component/report-level confidence — `chematic_crystal`'s construction-safety
       threshold isn't automatically a materials-anomaly threshold; see
       `docs/validation.md`.
+- [x] Phase 3 (core): coordination number / local environment (AGENTS.md §7.4) —
+      `diagnostics/coordination.rs`, new `MaterialDiagnosticReport::local_environment`
+      (`SCHEMA_VERSION` bumped to `2`), reported as descriptive per-site data, not findings
+      (coordination number for a clean structure isn't an anomaly). Method: candidate
+      neighbors bounded by covalent-radius-sum + tolerance epsilon=0.4 Å (Cordero et al.
+      2008 + Šidlauskaitė et al. 2026/arXiv:2601.02017 + PackFlow 2025 — the radius table's
+      first real consumer, closing the loop from the radius-table round), then the actual
+      shell boundary resolved as the largest relative gap in the sorted candidate-distance
+      list — a pure radius-sum+epsilon cutoff alone was hand-verified *before implementation*
+      to over-count CsCl (14 instead of 8) and perovskite's Ti (14 instead of 6); see
+      `docs/validation.md` and `diagnostics::coordination`'s module doc comment for the full
+      derivation, and `tests/known_good_fixtures.rs` / `coordination::tests` for the
+      regression tests proving the gap step is load-bearing on exactly those two cases plus
+      perovskite's three-shell Sr (12-fold, correctly not 12+8+6). Disordered
+      (multi-species) positions and unresolvable elements are skipped with a recorded
+      reason, never defaulted. `COORDINATION_UNDERCOORDINATED`/`OVERCOORDINATED` and
+      polyhedral distortion not implemented (need Phase 4's oxidation states and the
+      ideal-polyhedron reference set above, respectively). `FindingCode::CoordinationAmbiguous`
+      was drafted and then removed before shipping — see the ambiguity-criterion item above.

@@ -26,15 +26,20 @@ pub struct Provenance {
 }
 
 impl Provenance {
-    /// Builds provenance for the current crate version with no reference
-    /// tables recorded (v0.1 does not use any yet).
-    pub fn current() -> Self {
+    /// Builds provenance for the current crate version. `radius_table_version`
+    /// and `coordination_method` should be `Some` exactly when a check that
+    /// consumed that reference data actually ran (`None` otherwise, rather
+    /// than a value nothing used) — see `lib.rs::build_report`'s caller.
+    pub fn current(
+        radius_table_version: Option<String>,
+        coordination_method: Option<String>,
+    ) -> Self {
         Self {
             mikiwame_version: env!("CARGO_PKG_VERSION").to_string(),
             deterministic: true,
-            radius_table_version: None,
+            radius_table_version,
             oxidation_table_version: None,
-            coordination_method: None,
+            coordination_method,
         }
     }
 }

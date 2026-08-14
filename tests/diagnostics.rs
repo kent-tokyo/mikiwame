@@ -58,6 +58,16 @@ fn clean_nacl_is_structurally_consistent() {
             .iter()
             .all(|c| c.status == ComponentStatus::Ran)
     );
+    // Octahedral rock-salt coordination: every site sees exactly its 6
+    // opposite-element nearest neighbors, and nothing else (Na-Na/Cl-Cl at
+    // a/sqrt(2) sits outside even Na+Na+epsilon, the more generous of the
+    // two same-element cutoffs), so no gap step is needed at all --
+    // shell_gap_ratio is None because there is only ever one shell to see.
+    assert_eq!(report.local_environment.len(), 8);
+    for entry in &report.local_environment {
+        assert_eq!(entry.coordination_number, Some(6));
+        assert_eq!(entry.shell_gap_ratio, None);
+    }
 }
 
 #[test]

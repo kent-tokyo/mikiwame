@@ -50,6 +50,21 @@ constant's source is recorded in provenance. Implemented in this phase:
   informational, not an anomaly (AGENTS.md §7.7).
 * `DISORDER_OCCUPANCY_SUM_EXCEEDS_ONE` — a disordered group's occupancies summing above
   1.0; a site cannot be more than fully occupied, a logical fact not a tuned constant.
+* Coordination number / local environment (AGENTS.md §7.4, `diagnostics/coordination.rs`,
+  reported via `MaterialDiagnosticReport::local_environment`, not a finding — descriptive
+  data present for a clean structure too). Candidate neighbors bounded by covalent radii
+  (Cordero et al. 2008, `src/radii.rs`) summed pairwise plus a tolerance
+  epsilon = 0.4 Å, citable via Šidlauskaitė et al. 2026 (*Determination of bonding radii
+  from small-molecule crystal structures*, arXiv:2601.02017) and PackFlow (2025), which
+  independently converge on the same constant for the same style of bond heuristic. That
+  bound alone is not the shell boundary — see `docs/validation.md` for why a pure
+  radius-sum+epsilon cutoff over-counts CsCl and perovskite's Ti, and how the actual shell
+  boundary (largest relative gap in the sorted candidate-distance list) is what fixes it.
+  Method name/cutoff/table version recorded in `Provenance::coordination_method` and
+  `radius_table_version` (AGENTS.md §7.4's explicit requirement). Not implemented:
+  `COORDINATION_UNDERCOORDINATED`/`OVERCOORDINATED` (need an oxidation-state-dependent
+  expected value, Phase 4) and a `COORDINATION_AMBIGUOUS` finding (needs its own citable
+  cutoff on the reported `shell_gap_ratio` — see `tasks/todo.md`).
 
 Deferred to a later phase because they need a cited, versioned reference table before
 they can carry a threshold honestly:
@@ -63,8 +78,9 @@ they can carry a threshold honestly:
   (Phase 4) or a species-independent absolute-distance floor with its own citable basis.
 * `LATTICE_EXTREME_ASPECT_RATIO` / `LATTICE_POORLY_CONDITIONED` — "extreme" needs a
   documented criterion, not a guessed cutoff.
-* Coordination, distortion, composition/oxidation-state diagnostics — Phase 3/4, each
-  needs its own cited method/table. (Disorder's no-threshold subset above shipped early —
-  it didn't need one.)
+* Polyhedral distortion (AGENTS.md §7.5) and composition/oxidation-state diagnostics
+  (§7.6) — Phase 3/4, each needs its own cited method/table (an ideal-polyhedron reference
+  set, and a formal oxidation-state table, respectively). Coordination number above and
+  disorder's no-threshold subset both shipped early — neither needed one.
 
 See `tasks/todo.md` for the list this produces.
