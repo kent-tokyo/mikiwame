@@ -9,8 +9,10 @@ structurally unusual about it, **where**, and **on what evidence** — not a sin
 opaque score. See [`docs/scientific_scope.md`](docs/scientific_scope.md) for exactly
 what it does and does not claim.
 
-**Status: v0.1, early.** Only the checks that need no invented empirical threshold have
-shipped so far. See [`tasks/todo.md`](tasks/todo.md) for what's deferred and why, and
+**Status: pre-1.0, early** (crate version tracks features, not this milestone — see
+[`AGENTS.md`](AGENTS.md)'s own "v0.1" scope definition for what's in/out for now). Only
+the checks that need no invented empirical threshold have shipped so far. See
+[`tasks/todo.md`](tasks/todo.md) for what's deferred and why, and
 [`docs/architecture.md`](docs/architecture.md) for the design.
 
 ## What this is not

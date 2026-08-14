@@ -99,12 +99,14 @@ pub struct NeighborSpeciesCount {
 }
 
 /// Descriptive coordination/local-environment data for one site — not itself
-/// an anomaly (an unresolvable coordination shell is reported separately as
-/// `FindingCode::CoordinationAmbiguous`). One entry exists per site whenever
-/// [`ComponentName::Coordination`] ran at all; a site whose own coordination
-/// number couldn't be computed still gets an entry, with
-/// `coordination_number: None` and `not_computed_reason` explaining why
-/// (AGENTS.md §7.4).
+/// an anomaly. `shell_gap_ratio` is the ambiguity signal (how cleanly
+/// separated the resolved shell is from the next candidate) — v0.1 reports
+/// it but does not yet turn a low value into a finding; see
+/// `diagnostics::coordination`'s module doc comment and `tasks/todo.md`.
+/// One entry exists per site whenever [`ComponentName::Coordination`] ran at
+/// all; a site whose own coordination number couldn't be computed still gets
+/// an entry, with `coordination_number: None` and `not_computed_reason`
+/// explaining why (AGENTS.md §7.4).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct SiteLocalEnvironment {

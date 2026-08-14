@@ -9,8 +9,10 @@
 何を測定し、何を測定していないかの詳細は
 [`docs/scientific_scope.md`](docs/scientific_scope.md)を参照してください。
 
-**ステータス: v0.1、開発初期段階。** 経験的なしきい値を発明せずに実装できる診断のみが
-実装済みです。何が未実装で、なぜかは[`tasks/todo.md`](tasks/todo.md)を、設計は
+**ステータス: 1.0未満、開発初期段階**(crateのバージョン番号はこの開発マイルストーンとは
+別に機能単位で進みます — 「v0.1」というスコープ定義そのものは
+[`AGENTS.md`](AGENTS.md)を参照してください)。経験的なしきい値を発明せずに実装できる
+診断のみが実装済みです。何が未実装で、なぜかは[`tasks/todo.md`](tasks/todo.md)を、設計は
 [`docs/architecture.md`](docs/architecture.md)を参照してください。
 
 ## mikiwameが主張しないこと

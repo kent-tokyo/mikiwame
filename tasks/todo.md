@@ -41,12 +41,17 @@
       "how close to 1.0 counts as ambiguous" cutoff — would itself be exactly the kind of
       invented threshold AGENTS.md §21 forbids without a citable basis. Needs either a citation
       for that cutoff or a different, threshold-free ambiguity signal.
-- [ ] CIF input: still blocked on chematic-mol's occupancy-aware CIF reader (referred to
-      earlier as "PR2" in the chematic-crystal integration sequence), which has not landed —
-      confirmed via `gh pr list --repo kent-tokyo/chematic` (only chematic-crystal's PR #318
-      and the v0.15.0 release PR exist as of the coordination-number round). AGENTS.md forbids
-      reimplementing CIF infrastructure inside mikiwame ("一般的なCIF基盤の重複実装" is listed
-      under "mikiwameに含めない"), so this stays parked rather than worked around.
+- [ ] CIF input: still blocked on chematic-mol's occupancy-aware CIF reader. Real progress
+      upstream: `kent-tokyo/chematic` PR #323 ("feat(mol): CIF to PeriodicStructure adapter
+      (optional `crystal` feature)") is open — occupancy/disorder-preserving, explicit
+      `CifSymmetryStatus` for unexpanded symmetry, 12 new tests — and PR #324 adds
+      POSCAR/CONTCAR to `chematic-crystal`. Neither is merged as of this round. Per this
+      project's established pattern (wait for an actual chematic release, not an open/
+      unmerged branch whose API could still change — same reasoning applied to
+      chematic-crystal itself before integrating it), mikiwame-side CIF work still waits.
+      Watch PR #323 specifically next time this is revisited. AGENTS.md forbids
+      reimplementing CIF infrastructure inside mikiwame regardless
+      ("一般的なCIF基盤の重複実装" under "mikiwameに含めない").
 - [ ] Out-of-domain applicability detection (surfaces/interfaces/amorphous/polymers,
       AGENTS.md §5): `analyze` currently always reports `ApplicabilityLevel::FullyApplicable`
       for any input that passes input-quality checks. Parked here rather than implemented:
@@ -177,3 +182,24 @@
       polyhedral distortion not implemented (need Phase 4's oxidation states and the
       ideal-polyhedron reference set above, respectively). `FindingCode::CoordinationAmbiguous`
       was drafted and then removed before shipping — see the ambiguity-criterion item above.
+- [x] Differential validation (AGENTS.md §15.4), coordination-number slice:
+      `scripts/differential_validation.py` compares mikiwame's coordination numbers against
+      pymatgen's `CrystalNN` (both its chemically-weighted default and its documented
+      geometric-only mode) on the same 5 known-good fixtures, run in an isolated venv
+      (`.venv-differential-validation/`, gitignored). Result: exact agreement on all 10 site
+      cases, including perovskite's O (mikiwame: 2, tightest-shell method) — going in, this
+      was flagged as a likely disagreement against the "2 Ti + 4 Sr = 6" convention some
+      sources use, but pymatgen's CrystalNN independently lands on 2 as well. See
+      `docs/validation.md` for the full writeup, table, and scope caveats (coordination
+      number only, 5 idealized structures — not bond distances, symmetry, oxidation states,
+      or a broader corpus).
+- [x] Fixed a real doc bug found while reviewing the coordination-number round's output:
+      `SiteLocalEnvironment`'s doc comment (`src/report.rs`) referenced
+      `FindingCode::CoordinationAmbiguous`, which was drafted and then removed before
+      shipping (see the ambiguity-criterion item above) — the comment was never updated to
+      match. Reworded to describe what actually ships (`shell_gap_ratio` as the ambiguity
+      signal, no finding from it yet). Also reworded README.md/README_ja.md's "Status:
+      v0.1" line, which read as a version-number claim conflicting with the crate shipping
+      as 0.2.0 on crates.io — "v0.1" elsewhere in the repo (AGENTS.md, code comments) is a
+      project milestone/scope label, not a version claim, and was left alone; only the
+      two ambiguous user-facing "Status:" lines were reworded.

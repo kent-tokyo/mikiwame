@@ -146,15 +146,69 @@ composition analysis — Phase 4) or a species-independent absolute-floor check 
 citable basis (a different, narrower claim than "shorter than expected for these two
 elements"). See `tasks/todo.md`.
 
+## Differential validation: coordination number vs. pymatgen (2026-08-14)
+
+AGENTS.md §15.4 asks for differential comparison against pymatgen/spglib where possible.
+This covers the coordination-number slice: `scripts/differential_validation.py` builds
+the same five structures `tests/known_good_fixtures.rs` uses (identical lattice constants
+and fractional coordinates) with pymatgen and computes coordination number via
+`pymatgen.analysis.local_env.CrystalNN` in two configurations — its chemically-weighted
+default, and its documented geometric-only mode (`distance_cutoffs=None, x_diff_weight=0,
+porous_adjustment=False`, closer in spirit to mikiwame's own no-chemical-weighting
+method). Run inside an isolated virtualenv (`.venv-differential-validation/`, gitignored;
+see the script's own header for setup) — does not touch system Python, not wired into
+`cargo test` or CI.
+
+Result: **exact agreement on all 10 site cases across all 5 fixtures**, both CrystalNN
+configurations:
+
+```text
+structure    site   mikiwame  CrystalNN(default)  CrystalNN(geometric)  agree?
+--------------------------------------------------------------------------------
+NaCl         Na            6                   6                     6  yes
+NaCl         Cl            6                   6                     6  yes
+CsCl         Cs            8                   8                     8  yes
+CsCl         Cl            8                   8                     8  yes
+diamond      C             4                   4                     4  yes
+zinc_blende  Zn            4                   4                     4  yes
+zinc_blende  S             4                   4                     4  yes
+perovskite   Sr           12                  12                    12  yes
+perovskite   Ti            6                   6                     6  yes
+perovskite   O             2                   2                     2  yes
+```
+
+The perovskite-O case is the interesting one: mikiwame reports O as 2-coordinate (its
+tightest, most clearly separated shell — 2 collinear Ti neighbors at 1.9525 Å; see
+`diagnostics::coordination`'s module doc comment), which differs from the "2 Ti + 4 Sr =
+6" combined count some crystallography references use for O in perovskites. Going in,
+this was flagged as an expected, methodology-driven disagreement worth documenting either
+way — but pymatgen's `CrystalNN` (in both configurations) independently lands on the same
+2, not 6. That doesn't make the alternate "6" convention wrong (it's answering a related
+but different question — total near-neighbor count vs. tightest coordination shell — see
+`tests/known_good_fixtures.rs::perovskite_is_structurally_consistent`'s comment for that
+distinction) — it does mean two independent geometric methods agree on what the *tightest
+shell* boundary is, which is the specific claim mikiwame's coordination number makes.
+
+pymatgen logs `UserWarning`s when no oxidation states are set ("cannot locate an
+appropriate radius, covalent or atomic radii will be used") — expected and consistent:
+with no oxidation states given, `CrystalNN` falls back to covalent radii for its distance
+checks, the same category of reference data (Cordero et al. 2008 specifically, on
+mikiwame's side) both tools are working from.
+
+Scope of this comparison: coordination number only, on 5 idealized high-symmetry
+structures. Not covered: bond distances, symmetry/space-group information, oxidation
+states, distortion metrics (AGENTS.md §15.4 lists these too), skewed/low-symmetry
+structures, real experimental CIFs, or a benchmark corpus. A single clean agreement across
+5 textbook structures is meaningful evidence the method isn't obviously wrong, not a
+substitute for broader validation once CIF input and more diverse fixtures exist.
+
 ## Not yet done
 
-* Differential comparison against pymatgen/spglib (AGENTS.md §15.4) — no Python
-  materials-science stack is installed in the dev environment used so far. Not attempted
-  via a scratch `pip install`, since that would modify the environment beyond this repo
-  without being asked to.
-* Known-good fixture set beyond the single NaCl structure (AGENTS.md §15.1) — lower
-  priority than it looks: none of the currently-implemented diagnostics inspect real bond
-  distances/coordination (only exact same-position-same-element coincidence), so
-  additional "known-good" structures wouldn't exercise any new code path yet. Mainly
-  valuable once Phase 3 (coordination/distortion) lands.
+* Broader differential validation: bond distances, symmetry information, oxidation
+  states, distortion metrics (AGENTS.md §15.4); a larger/less idealized structure corpus
+  once CIF input exists (blocked on an upstream `chematic-mol` reader — see
+  `tasks/todo.md`).
+* Known-good fixture set beyond the five current structures (CsCl, NaCl, diamond, zinc
+  blende, perovskite; AGENTS.md §15.1) — wurtzite/rutile/spinel/graphite are deferred
+  pending a cited free-positional-parameter source (see `fixtures/README.md`).
 * Benchmark report (AGENTS.md §16) — no throughput/memory numbers have been measured.
