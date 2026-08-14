@@ -7,6 +7,15 @@ license = "MIT OR Apache-2.0"
 description = "Explainable materials structure diagnostics: evidence-first anomaly detection for periodic crystal structures."
 repository = "https://github.com/kent-tokyo/mikiwame"
 authors = ["kent-tokyo <kent-tokyo@users.noreply.github.com>"]
+# science::materials is the precise fit (crystallography named explicitly in
+# its own description); science::computational-chemistry for cross-discovery
+# from the chematic ecosystem's audience; command-line-utilities because the
+# `mikiwame` binary is a real, documented feature, not an afterthought.
+categories = ["science::materials", "science::computational-chemistry", "command-line-utilities"]
+# Chosen to describe what mikiwame *does* (diagnostics on crystal structures),
+# not just what data it holds -- structure/lattice representation itself is
+# chematic-crystal's keyword territory, not this crate's differentiator.
+keywords = ["crystallography", "materials-science", "crystal-structure", "diagnostics", "cheminformatics"]
 
 [dependencies]
 chematic-core = "0.15.0"
