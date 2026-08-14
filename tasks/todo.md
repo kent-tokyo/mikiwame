@@ -109,7 +109,7 @@
       Not wired into any diagnostic yet — see the new blocker above this table replaced
       ("Needs a cited source" section) and `docs/validation.md`.
 - [x] `chematic-crystal` 0.15.0 (published on crates.io the same day as this round)
-      integrated: added as a dependency, `structure_view::minimum_image_distance` now
+      integrated: added as a dependency, `structure_view::minimum_image` now
       delegates to `chematic_crystal::minimum_image` (exact, reciprocal-lattice-bounded
       search) instead of the old per-axis-rounding approximation, with a fallback to the
       old approximation only for lattices `Lattice::from_matrix` rejects that
@@ -124,3 +124,18 @@
       better model than mikiwame's "two sites at the same position" convention, but
       adopting it is a separate, larger change with its own occupancy-validation
       implications, not bundled into a geometry-only swap.
+- [x] Made the exact/fallback split from the item above observable: `minimum_image` now
+      returns a `PeriodicDistance { distance_angstrom, method }` instead of a bare `f64`;
+      `SITE_DUPLICATE`/`DISORDER_PRESENT`/`DISORDER_OCCUPANCY_SUM_EXCEEDS_ONE` findings
+      carry a `limitations` entry when the fallback was used and stay empty on the exact
+      path (previously unconditionally empty — a real evidence-first gap). Confidence
+      deliberately left unlowered either way, reasoning documented in
+      `docs/validation.md` (fallback can only produce false negatives for these
+      tolerance checks, never a false positive on a finding that did fire). Added
+      `Lattice::from_matrix`-rejection tests (near-singular, too-short-axis — two
+      distinct `CrystalError` variants) and report-level tests pinning both the
+      empty-on-exact and present-on-fallback cases. Did not implement
+      `LATTICE_POORLY_CONDITIONED`/`LATTICE_EXTREME_ASPECT_RATIO` or lower
+      component/report-level confidence — `chematic_crystal`'s construction-safety
+      threshold isn't automatically a materials-anomaly threshold; see
+      `docs/validation.md`.

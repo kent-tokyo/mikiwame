@@ -7,7 +7,7 @@
 
 use crate::finding::{Evidence, Finding, FindingCode, FindingScope, NumericEvidence};
 use crate::model::{MetricCode, Score01, Severity, Unit};
-use crate::structure_view::{PeriodicStructureView, minimum_image_distance};
+use crate::structure_view::{PeriodicStructureView, minimum_image};
 
 // ponytail: numerical-identity tolerance (float round-trip noise), not a
 // chemistry judgment about how close atoms may physically sit — that is
@@ -28,27 +28,33 @@ pub(crate) fn check<S: PeriodicStructureView>(structure: &S) -> Vec<Finding> {
             if sites[i].element != sites[j].element {
                 continue;
             }
-            let distance =
-                minimum_image_distance(lattice, sites[i].fractional, sites[j].fractional);
-            if distance < DUPLICATE_TOLERANCE_ANGSTROM {
+            let distance = minimum_image(lattice, sites[i].fractional, sites[j].fractional);
+            if distance.distance_angstrom < DUPLICATE_TOLERANCE_ANGSTROM {
                 findings.push(Finding {
                     code: FindingCode::SiteDuplicate,
                     severity: Severity::Critical,
+                    // Not lowered on the fallback path: a distance this
+                    // method reports as below tolerance is a genuine
+                    // periodic image at that separation either way (see
+                    // docs/validation.md's "fallback confidence" note) —
+                    // the fallback's risk is a missed finding (false
+                    // negative, nothing to attach confidence to), not a
+                    // wrong one.
                     confidence: certain(),
                     scope: FindingScope::SitePair { a: i, b: j },
                     evidence: vec![Evidence::Numeric(NumericEvidence {
                         metric: MetricCode::PeriodicDistance,
-                        observed: distance,
+                        observed: distance.distance_angstrom,
                         expected_range: None,
                         threshold: Some(DUPLICATE_TOLERANCE_ANGSTROM),
                         unit: Some(Unit::Angstrom),
                         site_indices: vec![i, j],
                     })],
                     explanation: format!(
-                        "sites {i} and {j} (both {}) coincide under periodic boundary conditions (separation {distance:.3e} \u{c5})",
-                        sites[i].element
+                        "sites {i} and {j} (both {}) coincide under periodic boundary conditions (separation {:.3e} \u{c5})",
+                        sites[i].element, distance.distance_angstrom
                     ),
-                    limitations: Vec::new(),
+                    limitations: distance.method.limitation().into_iter().collect(),
                 });
             }
         }

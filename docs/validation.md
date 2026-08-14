@@ -2,18 +2,18 @@
 
 ## Geometry conventions (closed-form, `src/structure_view.rs::tests`)
 
-The internal `cell_volume`/`frac_to_cart`/`minimum_image_distance` helpers are pinned
-against hand-derived closed-form values, not just exercised indirectly through the NaCl
-fixture (which is cubic — a row/column transposition bug would be invisible there, since
-both conventions agree on a diagonal lattice matrix):
+The internal `cell_volume`/`frac_to_cart`/`minimum_image` helpers are pinned against
+hand-derived closed-form values, not just exercised indirectly through the NaCl fixture
+(which is cubic — a row/column transposition bug would be invisible there, since both
+conventions agree on a diagonal lattice matrix):
 
 * `cell_volume` on a cubic cell equals `a³`; on a hexagonal cell (α=β=90°, γ=120°)
   equals `a²c·sin(γ)`, derived directly from the scalar triple product.
 * `frac_to_cart([1,0,0])` / `frac_to_cart([0,1,0])` land exactly on the lattice's first
   and second rows on the same non-orthogonal (hexagonal) cell — pins the row-vector
   convention.
-* `minimum_image_distance` correctly wraps a pair of sites across the cell boundary
-  (`0.05` vs. `0.95` fractional is `0.1` cells apart, not `0.9`).
+* `minimum_image` correctly wraps a pair of sites across the cell boundary (`0.05` vs.
+  `0.95` fractional is `0.1` cells apart, not `0.9`).
 
 ## Known limitation, fixed by delegating to `chematic_crystal` (2026-08-14)
 
@@ -26,7 +26,8 @@ a legitimate periodic image was under half the naive result.
 Once `chematic-crystal` 0.15.0 shipped an exact minimum-image search (a
 reciprocal-lattice-derived search box, provably sufficient, brute-force checked inside
 it — see that crate's `periodic` module and `docs/rfcs/chematic_crystal_foundation.md` in
-the `chematic` repo), `minimum_image_distance` was rewired to delegate to it.
+the `chematic` repo), the function (renamed `minimum_image` once it started returning a
+`PeriodicDistance` — see below) was rewired to delegate to it.
 `minimum_image_distance_finds_the_true_minimum_on_a_skewed_cell` runs the *same* skewed
 lattice through the new code path and asserts it now finds the true minimum — the fix is
 demonstrated, not just the old gap. The naive approximation is kept as
@@ -44,6 +45,51 @@ than refusing it (`docs/architecture.md`'s fatal/non-fatal split, `INPUT_INVALID
 being non-fatal, etc.). `PeriodicStructureView`/`Site` stay mikiwame's own types for this
 reason — `chematic_crystal` is used internally, on the geometry path only, after
 `input_quality`'s own checks have run. See `docs/chematic-prerequisites.md`.
+
+## Making the exact/fallback split observable (2026-08-14)
+
+The exact/fallback split above was initially invisible to report readers: whichever
+method computed a distance, `SITE_DUPLICATE`'s `limitations` was unconditionally empty.
+That's a real gap for an evidence-first tool — a caller can't tell whether a "no
+duplicate found" (or a found one) rested on the exact search or the weaker
+approximation.
+
+`structure_view::minimum_image` now returns a [`PeriodicDistance`], pairing the distance
+with a `PeriodicDistanceMethod` (`Exact` or `ApproximateFallback { reason }`, `reason`
+being `chematic_crystal`'s own `CrystalError` message — self-contained by that crate's
+own design, reused rather than re-derived). `separation::check` and `disorder::check`
+attach `PeriodicDistanceMethod::limitation()` to `SITE_DUPLICATE`, `DISORDER_PRESENT`,
+and `DISORDER_OCCUPANCY_SUM_EXCEEDS_ONE` findings when the fallback was used, and leave
+`limitations` empty on the exact path — pinned both ways by report-level tests in
+`tests/diagnostics.rs` (`coincident_same_element_sites_are_duplicates` for the empty
+case, `coincident_same_element_sites_on_a_near_singular_lattice_note_the_fallback` for
+the caveat). `structure_view::tests` separately pins that `Lattice::from_matrix`
+actually rejects a near-singular lattice and a too-short lattice vector (two distinct
+`CrystalError` variants), so the fallback path is exercised for a documented reason, not
+assumed reachable.
+
+**Confidence was deliberately left unlowered** on findings computed via the fallback,
+rather than picking an arbitrary discount (AGENTS.md §21 forbids exactly that: a
+threshold/penalty invented because it "sounds reasonable"). The reasoning: the naive
+per-axis-rounded distance is always a *real, achievable* periodic separation (rounding
+each fractional axis to its nearest integer is still a legitimate image, just not
+necessarily the shortest one) — so it can only be `>=` the true minimum, never smaller.
+For both `SITE_DUPLICATE` (fires when distance < a tight numerical-identity tolerance)
+and disorder's coincidence grouping (same tolerance, same direction of error), that means
+the fallback's only failure mode is a **false negative** — missing a real coincidence
+whose true minimum image is below tolerance but whose naive image isn't — never a false
+positive. A finding that *did* fire under the fallback is exactly as certain as one found
+via the exact search; there is no finding to attach a lowered confidence to for the ones
+that were missed. If a future check's error direction differs (over- rather than
+under-counting), this reasoning needs to be re-derived for that check, not copied.
+
+Not built this round (explicitly out of scope, per AGENTS.md §21's "don't reuse a
+neighboring threshold without its own basis" — see `tasks/todo.md`): turning
+`chematic_crystal`'s rejection reason into a scored `LATTICE_POORLY_CONDITIONED` finding,
+or lowering component/report-level confidence when the fallback is used. `condition_indicator()`
+being a *construction safety* threshold for `chematic_crystal`'s own algorithms doesn't
+by itself make it a *materials-science* anomaly threshold — that would need its own
+justification even though the number is right there.
 
 ## Metamorphic / invariance (`tests/metamorphic.rs`, AGENTS.md §15.3)
 

@@ -190,6 +190,49 @@ fn coincident_same_element_sites_are_duplicates() {
         codes(&report.findings),
         HashSet::from([FindingCode::SiteDuplicate])
     );
+    // NaCl's lattice is cubic -- well inside chematic_crystal::Lattice's
+    // acceptance range -- so this took the exact minimum-image path, which
+    // has nothing to caveat.
+    assert!(
+        report.findings[0].limitations.is_empty(),
+        "exact-path SITE_DUPLICATE should have no limitations, got {:?}",
+        report.findings[0].limitations
+    );
+}
+
+#[test]
+fn coincident_same_element_sites_on_a_near_singular_lattice_note_the_fallback() {
+    // Same "b" vector chematic_crystal::Lattice::from_matrix rejects as
+    // near-singular in structure_view::tests -- positive volume, so
+    // input_quality's LATTICE_SINGULAR (fatal only for volume <= 0) lets it
+    // through to separation, which must fall back rather than panic.
+    let lattice = [[1.0, 0.0, 0.0], [0.5, 1e-4, 0.0], [0.0, 0.0, 1.0]];
+    let sites = vec![
+        Site {
+            element: "Na".to_string(),
+            fractional: [0.2, 0.2, 0.2],
+            occupancy: 1.0,
+        },
+        Site {
+            element: "Na".to_string(),
+            fractional: [0.2, 0.2, 0.2],
+            occupancy: 1.0,
+        },
+    ];
+    let report = analyze(
+        &OwnedStructure::new(lattice, sites),
+        &AnalysisConfig::default(),
+    );
+    assert_eq!(
+        codes(&report.findings),
+        HashSet::from([FindingCode::SiteDuplicate])
+    );
+    let limitations = &report.findings[0].limitations;
+    assert_eq!(limitations.len(), 1, "got {limitations:?}");
+    assert!(
+        limitations[0].contains("approximated"),
+        "expected the fallback caveat, got {limitations:?}"
+    );
 }
 
 #[test]

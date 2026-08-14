@@ -7,12 +7,23 @@
 //! sum to more than 1.0 *is* flagged: a site cannot be more than fully
 //! occupied, which is a logical fact needing no external threshold, unlike
 //! `SITE_SEVERE_OVERLAP` (deferred; see `tasks/todo.md`).
+//!
+//! Findings here keep full confidence even when `coincidence_groups` used
+//! `structure_view`'s approximate fallback distance method (recorded in
+//! `limitations` instead, same reasoning as `separation::check`): the
+//! fallback's naive per-axis-rounded distance is always a real, achievable
+//! periodic separation, never smaller than the true minimum — so any group
+//! it *does* merge is a genuine coincidence. Its risk is a group that
+//! *should* have merged but didn't (a missed `DISORDER_PRESENT`, or an
+//! occupancy sum computed over too few sites to trip
+//! `DISORDER_OCCUPANCY_SUM_EXCEEDS_ONE`), which is a false negative with no
+//! finding to attach a lowered confidence to.
 
 use std::collections::{HashMap, HashSet};
 
 use crate::finding::{Evidence, Finding, FindingCode, FindingScope, NumericEvidence};
 use crate::model::{ClosedRange, MetricCode, Score01, Severity, Unit};
-use crate::structure_view::{PeriodicStructureView, minimum_image_distance};
+use crate::structure_view::{PeriodicStructureView, minimum_image};
 
 // Numerical-identity tolerance (float round-trip noise), same value and
 // justification as separation::DUPLICATE_TOLERANCE_ANGSTROM. Kept as its own
@@ -31,22 +42,32 @@ fn find(parent: &mut [usize], x: usize) -> usize {
 }
 
 /// Groups of site indices that mutually coincide under PBC, by transitive
-/// closure over pairwise coincidence.
+/// closure over pairwise coincidence, plus a `Finding::limitations` entry if
+/// any pairwise distance behind that grouping used the approximate fallback
+/// (see `structure_view::minimum_image`). The fallback decision depends only
+/// on the structure's one shared lattice, not on which pair is being
+/// compared, so in practice every pair agrees — this just surfaces whichever
+/// one the loop happens to see.
 ///
 /// ponytail: O(n^2) pairwise scan plus union-find; fine at v0.1's scale
 /// (matches separation::check's own O(n^2) scan), revisit if mikiwame is
 /// used on structures with many thousands of sites.
-fn coincidence_groups<S: PeriodicStructureView>(structure: &S) -> Vec<Vec<usize>> {
+fn coincidence_groups<S: PeriodicStructureView>(
+    structure: &S,
+) -> (Vec<Vec<usize>>, Option<String>) {
     let lattice = structure.lattice();
     let sites = structure.sites();
     let n = sites.len();
     let mut parent: Vec<usize> = (0..n).collect();
+    let mut fallback_limitation: Option<String> = None;
 
     for i in 0..n {
         for j in (i + 1)..n {
-            let distance =
-                minimum_image_distance(lattice, sites[i].fractional, sites[j].fractional);
-            if distance < COINCIDENCE_TOLERANCE_ANGSTROM {
+            let distance = minimum_image(lattice, sites[i].fractional, sites[j].fractional);
+            if fallback_limitation.is_none() {
+                fallback_limitation = distance.method.limitation();
+            }
+            if distance.distance_angstrom < COINCIDENCE_TOLERANCE_ANGSTROM {
                 let (root_i, root_j) = (find(&mut parent, i), find(&mut parent, j));
                 if root_i != root_j {
                     parent[root_i] = root_j;
@@ -60,14 +81,18 @@ fn coincidence_groups<S: PeriodicStructureView>(structure: &S) -> Vec<Vec<usize>
         let root = find(&mut parent, i);
         groups.entry(root).or_default().push(i);
     }
-    groups.into_values().filter(|g| g.len() > 1).collect()
+    (
+        groups.into_values().filter(|g| g.len() > 1).collect(),
+        fallback_limitation,
+    )
 }
 
 pub(crate) fn check<S: PeriodicStructureView>(structure: &S) -> Vec<Finding> {
     let sites = structure.sites();
     let mut findings = Vec::new();
+    let (groups, fallback_limitation) = coincidence_groups(structure);
 
-    for group in coincidence_groups(structure) {
+    for group in groups {
         let distinct_elements: HashSet<&str> =
             group.iter().map(|&i| sites[i].element.as_str()).collect();
         if distinct_elements.len() < 2 {
@@ -88,7 +113,7 @@ pub(crate) fn check<S: PeriodicStructureView>(structure: &S) -> Vec<Finding> {
                 "sites {group:?} ({} distinct elements) coincide under periodic boundary conditions: modeled as positional disorder, not an anomaly",
                 distinct_elements.len()
             ),
-            limitations: Vec::new(),
+            limitations: fallback_limitation.clone().into_iter().collect(),
         });
 
         let occupancies: Vec<f64> = group.iter().map(|&i| sites[i].occupancy).collect();
@@ -115,7 +140,7 @@ pub(crate) fn check<S: PeriodicStructureView>(structure: &S) -> Vec<Finding> {
                     explanation: format!(
                         "disordered site group's occupancies sum to {occupancy_sum}, which exceeds 1.0"
                     ),
-                    limitations: Vec::new(),
+                    limitations: fallback_limitation.clone().into_iter().collect(),
                 });
             }
         }
