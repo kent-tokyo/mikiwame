@@ -77,14 +77,22 @@ is explicit that disorder is not itself an anomaly.
 
 ## Why a trait instead of a concrete struct
 
-`PeriodicStructureView` is the boundary chosen in `docs/chematic-prerequisites.md`
-because chematic's default branch has no periodic-structure type to depend on yet.
-Depending on a trait rather than mikiwame's own concrete "Structure" type means:
+`PeriodicStructureView` was originally chosen in `docs/chematic-prerequisites.md` because
+chematic's default branch had no periodic-structure type to depend on. As of 2026-08-14
+that's no longer true — `chematic-crystal` 0.15.0 ships `PeriodicStructure` — but the
+trait stayed anyway, for a different reason documented in that file's 2026-08-14 update:
+`chematic_crystal::PeriodicStructure::new` validates and rejects malformed input, while
+`PeriodicStructureView` is mikiwame's boundary for structures it's meant to *diagnose*,
+which can't all be valid by construction. `chematic_crystal` is used internally on the
+geometry path (`structure_view::minimum_image_distance`), after `input_quality` runs.
 
-* callers with their own structure type (including a future chematic type) implement
-  the trait instead of converting into a mikiwame-owned struct;
+Depending on a trait rather than mikiwame's own concrete "Structure" type still means:
+
+* callers with their own structure type implement the trait instead of converting into a
+  mikiwame-owned struct;
 * mikiwame never grows an independent, competing structure representation
-  (AGENTS.md §4's explicit prohibition).
+  (AGENTS.md §4's explicit prohibition) — it borrows `chematic_crystal`'s geometry rather
+  than re-deriving it.
 
 ## Score/finding separation
 

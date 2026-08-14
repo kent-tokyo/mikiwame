@@ -69,9 +69,12 @@ CLIは`cli` Cargo feature（デフォルトで有効）の裏にあります。`
 
 ## `chematic`との関係
 
-`mikiwame`は自前の最小限の読み取り専用トレイト`PeriodicStructureView`のみに依存します。
-`chematic`の現在のdefault branchには周期構造・occupancyを扱う型が存在しないためです。
-調査内容と、より密な統合のために`chematic`側に必要となる型については
+公開の入力境界は今も自前の最小限の読み取り専用トレイト`PeriodicStructureView`です —
+これは暫定措置ではなく意図的な選択です。`chematic-crystal`の型は構築時に不正な入力を
+検証・拒否しますが、mikiwameの前提は不正な構造を「拒否」ではなく「診断」することに
+あります。一方、内部的には周期境界条件の幾何計算(厳密な最小image距離)のために
+[`chematic-crystal`](https://crates.io/crates/chematic-crystal)に依存するようになり
+ました。詳しい経緯は
 [`docs/chematic-prerequisites.md`](docs/chematic-prerequisites.md)を参照してください。
 
 ## 未実装

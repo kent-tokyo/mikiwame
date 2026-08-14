@@ -70,10 +70,14 @@ in `serde_json`).
 
 ## Relationship to `chematic`
 
-`mikiwame` depends only on its own minimal, read-only `PeriodicStructureView` trait —
-`chematic`'s current default branch has no periodic/occupancy-aware structure type to
-build on. See [`docs/chematic-prerequisites.md`](docs/chematic-prerequisites.md) for
-the investigation and what would need to exist in `chematic` for a tighter integration.
+The public input boundary is still mikiwame's own minimal, read-only
+`PeriodicStructureView` trait — deliberately, not a stopgap: `chematic-crystal`'s types
+validate and reject malformed input at construction, while mikiwame's whole premise is
+diagnosing malformed input, not refusing it. Internally, though, `mikiwame` now depends
+on [`chematic-crystal`](https://crates.io/crates/chematic-crystal) for periodic-boundary
+geometry (exact minimum-image distance). See
+[`docs/chematic-prerequisites.md`](docs/chematic-prerequisites.md) for the full
+reasoning.
 
 ## Not yet implemented
 

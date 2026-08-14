@@ -91,12 +91,44 @@ pub(crate) fn frac_to_cart(lattice: &[[f64; 3]; 3], frac: [f64; 3]) -> [f64; 3] 
 
 /// Minimum-image distance between two fractional positions under PBC.
 ///
-/// ponytail: wraps each fractional axis independently to its nearest image
-/// (`d -= round(d)`) rather than searching the full 3×3×3 neighboring-cell
-/// shell. Exact for reasonably orthogonal cells; can miss the true minimum
-/// image for highly skewed/acute lattices. Upgrade to a 3×3×3 image search if
-/// mikiwame is used on strongly non-orthogonal cells.
+/// Delegates to `chematic_crystal::minimum_image`, which is exact for any
+/// lattice it accepts (a reciprocal-lattice-derived search box, brute-force
+/// checked inside it — see that crate's `periodic` module doc for the
+/// derivation and its own oracle tests). This fixed a real gap: the
+/// previous per-axis-rounding approximation could miss the true minimum
+/// image on skewed cells (see `docs/validation.md`).
+///
+/// `input_quality`'s `LATTICE_SINGULAR` check is fatal only for non-positive
+/// cell volume, not for near-singularity or a very short axis — both of
+/// which `chematic_crystal::Lattice::from_matrix` rejects. So a lattice that
+/// passed `input_quality` and reached here can still fail construction; in
+/// that case this falls back to the old per-axis approximation rather than
+/// panicking, so `separation`/`disorder` keep running on such lattices
+/// exactly as they did before this change. Adopting
+/// `chematic_crystal::Lattice`'s stricter condition-number criterion as
+/// `LATTICE_SINGULAR`'s own threshold (it would also resolve the
+/// `LATTICE_EXTREME_ASPECT_RATIO` backlog item — see `tasks/todo.md`) is a
+/// separate, future decision, not made here.
 pub(crate) fn minimum_image_distance(lattice: &[[f64; 3]; 3], a: [f64; 3], b: [f64; 3]) -> f64 {
+    match chematic_crystal::Lattice::from_matrix(*lattice) {
+        Ok(crystal_lattice) => {
+            chematic_crystal::minimum_image(
+                &crystal_lattice,
+                chematic_crystal::FractionalCoord::new(a),
+                chematic_crystal::FractionalCoord::new(b),
+            )
+            .distance
+        }
+        Err(_) => naive_minimum_image_distance(lattice, a, b),
+    }
+}
+
+/// The per-axis-rounding approximation `minimum_image_distance` used
+/// exclusively before this module started delegating to
+/// `chematic_crystal::minimum_image`. Kept only as a fallback for lattices
+/// `chematic_crystal::Lattice::from_matrix` rejects as near-singular — see
+/// `minimum_image_distance`'s doc comment.
+fn naive_minimum_image_distance(lattice: &[[f64; 3]; 3], a: [f64; 3], b: [f64; 3]) -> f64 {
     let mut delta = [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
     for x in delta.iter_mut() {
         *x -= x.round();
@@ -172,33 +204,62 @@ mod tests {
         approx(d, 0.1 * a);
     }
 
+    /// Same skewed lattice/points as the naive-fallback regression below,
+    /// but exercised through the public `minimum_image_distance` dispatcher
+    /// — proves the `chematic_crystal` swap actually fixed the gap, not
+    /// just that the crate's own tests claim to.
     #[test]
-    fn naive_minimum_image_can_miss_the_true_minimum_on_a_skewed_cell() {
-        // Documents the ceiling named in minimum_image_distance's `ponytail`
-        // comment. With nearly-parallel lattice vectors a and b, a legitimate
-        // periodic image (p vs. q shifted by one whole b vector) is
-        // dramatically shorter than what independent per-axis rounding finds
-        // — because that image requires a *different* integer shift on the a
-        // axis than on the b axis, which per-axis rounding of a single delta
-        // cannot produce when both components start out equal.
+    fn minimum_image_distance_finds_the_true_minimum_on_a_skewed_cell() {
         let lattice = [[1.0, 0.0, 0.0], [0.9, 0.1, 0.0], [0.0, 0.0, 10.0]];
         let p = [0.75, 0.75, 0.0];
         let q = [0.25, 0.25, 0.0];
 
-        let naive = minimum_image_distance(&lattice, p, q);
+        let found = minimum_image_distance(&lattice, p, q);
+        let true_min = true_minimum_via_known_shorter_image(&lattice, p, q);
 
+        approx(found, true_min);
+    }
+
+    /// Documents that the fallback path (used only when
+    /// `chematic_crystal::Lattice::from_matrix` rejects the lattice — see
+    /// `minimum_image_distance`'s doc comment) still has the historical
+    /// per-axis-rounding gap. With nearly-parallel lattice vectors a and b,
+    /// a legitimate periodic image (p vs. q shifted by one whole b vector)
+    /// is dramatically shorter than what independent per-axis rounding
+    /// finds — because that image requires a *different* integer shift on
+    /// the a axis than on the b axis, which per-axis rounding of a single
+    /// delta cannot produce when both components start out equal.
+    #[test]
+    fn naive_fallback_can_still_miss_the_true_minimum_on_a_skewed_cell() {
+        let lattice = [[1.0, 0.0, 0.0], [0.9, 0.1, 0.0], [0.0, 0.0, 10.0]];
+        let p = [0.75, 0.75, 0.0];
+        let q = [0.25, 0.25, 0.0];
+
+        let naive = naive_minimum_image_distance(&lattice, p, q);
+        let true_min = true_minimum_via_known_shorter_image(&lattice, p, q);
+
+        assert!(
+            true_min < naive * 0.5,
+            "expected a much shorter periodic image ({true_min}) than the naive result ({naive})"
+        );
+    }
+
+    /// The true minimum-image distance between `p` and `q` on the
+    /// deliberately-skewed test lattice shared by the two tests above,
+    /// found by hand via the specific known-shorter image (`q` shifted by
+    /// one whole `b` lattice vector) rather than a general search.
+    fn true_minimum_via_known_shorter_image(
+        lattice: &[[f64; 3]; 3],
+        p: [f64; 3],
+        q: [f64; 3],
+    ) -> f64 {
         let q_shifted_by_b = [q[0], q[1] + 1.0, q[2]];
         let true_delta = [
             p[0] - q_shifted_by_b[0],
             p[1] - q_shifted_by_b[1],
             p[2] - q_shifted_by_b[2],
         ];
-        let cart = frac_to_cart(&lattice, true_delta);
-        let true_min = (cart[0] * cart[0] + cart[1] * cart[1] + cart[2] * cart[2]).sqrt();
-
-        assert!(
-            true_min < naive * 0.5,
-            "expected a much shorter periodic image ({true_min}) than the naive result ({naive})"
-        );
+        let cart = frac_to_cart(lattice, true_delta);
+        (cart[0] * cart[0] + cart[1] * cart[1] + cart[2] * cart[2]).sqrt()
     }
 }

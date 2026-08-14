@@ -9,6 +9,7 @@ repository = "https://github.com/kent-tokyo/mikiwame"
 authors = ["kent-tokyo <kent-tokyo@users.noreply.github.com>"]
 
 [dependencies]
+chematic-crystal = "0.15.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", optional = true }
 

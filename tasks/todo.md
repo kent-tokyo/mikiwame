@@ -1,11 +1,5 @@
 # todo
 
-## Blocked on owner decision (AGENTS.md §22)
-
-- [ ] Review `docs/chematic-prerequisites.md` and decide whether/when to open the
-      `chematic` PR for `Lattice`/`PeriodicStructure`/periodic-neighbor-search/occupancy
-      CIF reading. Not started; separate repo/PR per AGENTS.md §4.
-
 ## Needs a cited source before implementation (do not guess thresholds)
 
 - [ ] `SITE_SEVERE_OVERLAP` / `SITE_UNUSUALLY_SHORT_DISTANCE` (AGENTS.md §7.3). The radius
@@ -26,7 +20,14 @@
 - [ ] Documented criterion for "extreme" lattice aspect ratio / poor conditioning
       (`LATTICE_EXTREME_ASPECT_RATIO`, `LATTICE_POORLY_CONDITIONED`) — currently only
       `LATTICE_SINGULAR` (volume ≤ 0 or numerically singular) is implemented, since that
-      needs no tuned constant.
+      needs no tuned constant. Candidate now available: `chematic_crystal::Lattice`
+      exposes `condition_indicator()` (volume / bounding-box-volume) with its own
+      `MIN_CONDITION_INDICATOR = 1e-3` threshold and test suite — `Lattice::from_matrix`
+      already rejects near-singular/very-short-axis lattices mikiwame's own
+      `LATTICE_SINGULAR` currently lets through (see `structure_view.rs`'s
+      `minimum_image_distance` fallback and `docs/validation.md`). Adopting this as
+      mikiwame's own threshold is still an owner decision (changes what's fatal), not
+      done in this round.
 - [ ] Formal oxidation-state table (source + version) for §7.6 composition/charge checks.
 - [ ] Neighbor-definition method (name + cutoff rule + provenance) for §7.4 coordination.
 - [ ] Ideal-polyhedron reference set for §7.5 distortion metrics.
@@ -107,3 +108,19 @@
       hybridization/spin-state disambiguation documented in the module doc comment).
       Not wired into any diagnostic yet — see the new blocker above this table replaced
       ("Needs a cited source" section) and `docs/validation.md`.
+- [x] `chematic-crystal` 0.15.0 (published on crates.io the same day as this round)
+      integrated: added as a dependency, `structure_view::minimum_image_distance` now
+      delegates to `chematic_crystal::minimum_image` (exact, reciprocal-lattice-bounded
+      search) instead of the old per-axis-rounding approximation, with a fallback to the
+      old approximation only for lattices `Lattice::from_matrix` rejects that
+      `LATTICE_SINGULAR` doesn't catch. `SITE_DUPLICATE` and disorder's coincidence
+      detection both ride on this for free (same shared function). `PeriodicStructureView`
+      kept as mikiwame's own input boundary rather than switched to
+      `chematic_crystal::PeriodicStructure` — see `docs/chematic-prerequisites.md`'s
+      2026-08-14 update for why (construction-time validation vs. mikiwame's
+      diagnose-don't-refuse model). `Site`/`OwnedStructure`, the CLI JSON schema, and
+      `disorder.rs`'s multi-site coincidence-group representation were deliberately left
+      alone this round — chematic_crystal's native multi-species `PeriodicSite` is a
+      better model than mikiwame's "two sites at the same position" convention, but
+      adopting it is a separate, larger change with its own occupancy-validation
+      implications, not bundled into a geometry-only swap.

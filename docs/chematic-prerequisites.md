@@ -1,5 +1,29 @@
 # chematic prerequisites for mikiwame
 
+## Update (2026-08-14): chematic-crystal shipped, trait kept anyway
+
+`chematic-crystal` 0.15.0 now provides everything requested below (`Lattice`,
+`PeriodicStructure`, `PeriodicSite` with multi-species occupancy for disorder, exact
+minimum-image PBC distance, periodic neighbor search, diagonal supercells). mikiwame now
+depends on it (`Cargo.toml`) and `structure_view::minimum_image_distance` delegates to
+`chematic_crystal::minimum_image` — see `docs/validation.md`.
+
+`PeriodicStructureView`/`Site` were **not** deleted in favor of `chematic_crystal`'s own
+types, and the original reason below ("chematic has nothing to depend on") is no longer
+why. The reason that survives: `chematic_crystal::PeriodicStructure::new` and
+`PeriodicSite::new` *validate and reject* malformed input (`Result`, `Err` on negative or
+over-summed occupancy, empty species, non-finite coordinates) — but mikiwame's entire
+premise is to accept a structure exactly as given and *diagnose* what's wrong with it,
+not refuse it (`INPUT_INVALID_OCCUPANCY` and `DISORDER_OCCUPANCY_SUM_EXCEEDS_ONE` are
+both non-fatal findings today; a caller handing mikiwame a structure with occupancy 1.4
+expects a report back, not a constructor error). A `chematic_crystal::PeriodicStructure`
+literally cannot represent that input. So `PeriodicStructureView` stays mikiwame's public
+input boundary — the only type that can hold a structure mikiwame is supposed to
+diagnose — and `chematic_crystal` is used internally, for geometry only, after
+`input_quality`'s own checks (see `diagnostics/mod.rs`'s pipeline order).
+
+The rest of this document is the original Phase 0 finding, left as-is for history.
+
 ## Finding (Phase 0 investigation, 2026-08-13)
 
 Investigated `chematic` at its GitHub default branch (`main`, checked out locally as

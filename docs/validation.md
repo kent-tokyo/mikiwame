@@ -15,17 +15,35 @@ both conventions agree on a diagonal lattice matrix):
 * `minimum_image_distance` correctly wraps a pair of sites across the cell boundary
   (`0.05` vs. `0.95` fractional is `0.1` cells apart, not `0.9`).
 
-## Known limitation, demonstrated not just claimed
+## Known limitation, fixed by delegating to `chematic_crystal` (2026-08-14)
 
-`minimum_image_distance` wraps each fractional axis independently
-(`d -= round(d)` per component) rather than searching the full 3×3×3 neighboring-cell
-shell. `naive_minimum_image_can_miss_the_true_minimum_on_a_skewed_cell` constructs a
-lattice with nearly-parallel `a`/`b` vectors (`a=(1,0,0)`, `b=(0.9,0.1,0)`) where a
-legitimate periodic image is found to be under half the naive result — the test asserts
-this gap exists, so the limitation named in the function's `ponytail:` comment is
-verified, not just asserted in prose. Affects `SITE_DUPLICATE` (and any future
-distance-based check) only for structures with strongly skewed/acute cells; the shipped
-NaCl fixture and any orthogonal-ish cell are unaffected.
+`minimum_image_distance` used to wrap each fractional axis independently
+(`d -= round(d)` per component) rather than searching the full periodic-image
+neighborhood. `naive_minimum_image_can_miss_the_true_minimum_on_a_skewed_cell` pinned
+this: a lattice with nearly-parallel `a`/`b` vectors (`a=(1,0,0)`, `b=(0.9,0.1,0)`) where
+a legitimate periodic image was under half the naive result.
+
+Once `chematic-crystal` 0.15.0 shipped an exact minimum-image search (a
+reciprocal-lattice-derived search box, provably sufficient, brute-force checked inside
+it — see that crate's `periodic` module and `docs/rfcs/chematic_crystal_foundation.md` in
+the `chematic` repo), `minimum_image_distance` was rewired to delegate to it.
+`minimum_image_distance_finds_the_true_minimum_on_a_skewed_cell` runs the *same* skewed
+lattice through the new code path and asserts it now finds the true minimum — the fix is
+demonstrated, not just the old gap. The naive approximation is kept as
+`naive_minimum_image_distance`, used only as a fallback for lattices
+`chematic_crystal::Lattice::from_matrix` rejects (near-singular, or an axis shorter than
+its `MIN_LENGTH`) that `input_quality`'s own `LATTICE_SINGULAR` check — fatal only for
+non-positive volume — doesn't catch;
+`naive_fallback_can_still_miss_the_true_minimum_on_a_skewed_cell` keeps pinning that this
+fallback path still has the historical gap, since it's still reachable code.
+
+This is one instance of a broader design point worth recording: `chematic_crystal`
+validates and rejects at construction (`Lattice::from_matrix`, `PeriodicStructure::new`
+return `Result`), while mikiwame's whole premise is diagnosing malformed input rather
+than refusing it (`docs/architecture.md`'s fatal/non-fatal split, `INPUT_INVALID_OCCUPANCY`
+being non-fatal, etc.). `PeriodicStructureView`/`Site` stay mikiwame's own types for this
+reason — `chematic_crystal` is used internally, on the geometry path only, after
+`input_quality`'s own checks have run. See `docs/chematic-prerequisites.md`.
 
 ## Metamorphic / invariance (`tests/metamorphic.rs`, AGENTS.md §15.3)
 

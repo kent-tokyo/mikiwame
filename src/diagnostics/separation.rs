@@ -48,9 +48,7 @@ pub(crate) fn check<S: PeriodicStructureView>(structure: &S) -> Vec<Finding> {
                         "sites {i} and {j} (both {}) coincide under periodic boundary conditions (separation {distance:.3e} \u{c5})",
                         sites[i].element
                     ),
-                    limitations: vec![
-                        "minimum-image search checks each fractional axis independently; may miss the true minimum image for highly skewed cells".to_string(),
-                    ],
+                    limitations: Vec::new(),
                 });
             }
         }
