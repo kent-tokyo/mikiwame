@@ -41,17 +41,34 @@
       "how close to 1.0 counts as ambiguous" cutoff — would itself be exactly the kind of
       invented threshold AGENTS.md §21 forbids without a citable basis. Needs either a citation
       for that cutoff or a different, threshold-free ambiguity signal.
-- [ ] CIF input: still blocked on chematic-mol's occupancy-aware CIF reader. Real progress
-      upstream: `kent-tokyo/chematic` PR #323 ("feat(mol): CIF to PeriodicStructure adapter
-      (optional `crystal` feature)") is open — occupancy/disorder-preserving, explicit
-      `CifSymmetryStatus` for unexpanded symmetry, 12 new tests — and PR #324 adds
-      POSCAR/CONTCAR to `chematic-crystal`. Neither is merged as of this round. Per this
-      project's established pattern (wait for an actual chematic release, not an open/
-      unmerged branch whose API could still change — same reasoning applied to
-      chematic-crystal itself before integrating it), mikiwame-side CIF work still waits.
-      Watch PR #323 specifically next time this is revisited. AGENTS.md forbids
-      reimplementing CIF infrastructure inside mikiwame regardless
-      ("一般的なCIF基盤の重複実装" under "mikiwameに含めない").
+- [ ] CIF input: `kent-tokyo/chematic` PR #323 ("feat(mol): CIF to PeriodicStructure
+      adapter, optional `crystal` feature on `chematic-mol`") **merged to `main`
+      2026-08-14T05:37:58Z** — occupancy/disorder-preserving, explicit `CifSymmetryStatus`
+      for unexpanded symmetry, 12 new tests. Still blocked on an actual release, though:
+      `chematic`'s workspace version is still `0.15.0`, and that release (published
+      2026-08-14T02:05:15Z) predates the PR #323 merge — the adapter is on `main`, not in
+      any published `chematic-mol` version yet. Per this project's established pattern
+      (wait for an actual release, not an unreleased `main` — same reasoning applied to
+      chematic-crystal itself before integrating it, and confirmed again here), still
+      parked. PR #324 (POSCAR/CONTCAR) is open and mergeable but not on mikiwame's critical
+      path — only #323 is.
+
+      **Decided ahead of time, for whenever a release lands** (so this isn't re-litigated
+      mid-implementation): add an optional `cif` feature —
+      `cif = ["dep:chematic-mol", "chematic-mol/crystal"]` — gated the same way `cli`
+      gates `serde_json` today. And: `chematic-mol`'s CIF adapter *rejects* malformed
+      input (occupancy-sum-exceeded etc. surface as `chematic_crystal::CrystalError`,
+      per PR #323's own design, matching `chematic_crystal::PeriodicSite`'s
+      validate-at-construction model) — the same tension `docs/chematic-prerequisites.md`
+      already documents between chematic's reject-invalid model and mikiwame's
+      diagnose-don't-refuse one. First-cut resolution: the CIF reader is a convenience
+      input path for *valid* CIFs; a CIF that fails `chematic-mol`'s validation becomes a
+      CLI error (not a diagnosed `InvalidInput` report) — callers who need
+      `INPUT_INVALID_OCCUPANCY`-style diagnosis of a malformed structure use the existing
+      JSON/API input path instead. Mapping CIF parse/validation errors into mikiwame's own
+      finding codes is explicitly deferred (would need a raw, un-validated CIF
+      intermediate representation upstream, which doesn't exist and would meaningfully
+      expand scope) — not attempted in the first CIF-input round.
 - [ ] Out-of-domain applicability detection (surfaces/interfaces/amorphous/polymers,
       AGENTS.md §5): `analyze` currently always reports `ApplicabilityLevel::FullyApplicable`
       for any input that passes input-quality checks. Parked here rather than implemented:
@@ -203,3 +220,15 @@
       as 0.2.0 on crates.io — "v0.1" elsewhere in the repo (AGENTS.md, code comments) is a
       project milestone/scope label, not a version claim, and was left alone; only the
       two ambiguous user-facing "Status:" lines were reworded.
+- [x] Made the differential-validation script above genuinely end-to-end. It originally
+      compared pymatgen against a hand-maintained Python dict of mikiwame's *expected*
+      coordination numbers — real agreement between that table and pymatgen, but no
+      guarantee the table still matched what `diagnostics::coordination` actually computes,
+      and no mechanism to notice if it drifted. `scripts/differential_validation.py` now
+      builds the `mikiwame` CLI, runs `analyze --format json` on each fixture as a real
+      subprocess, and reads `coordination_number` out of the actual returned
+      `local_environment` — a real regression would show up here, not just in `cargo test`.
+      Also now checks all 31 individual sites (not one representative per element) and
+      exits non-zero on any mismatch, and records both the mikiwame and pymatgen versions
+      actually used in its output. Result unchanged: 0 mismatches. See
+      `docs/validation.md`.

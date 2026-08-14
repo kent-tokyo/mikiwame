@@ -150,31 +150,66 @@ elements"). See `tasks/todo.md`.
 
 AGENTS.md §15.4 asks for differential comparison against pymatgen/spglib where possible.
 This covers the coordination-number slice: `scripts/differential_validation.py` builds
-the same five structures `tests/known_good_fixtures.rs` uses (identical lattice constants
-and fractional coordinates) with pymatgen and computes coordination number via
-`pymatgen.analysis.local_env.CrystalNN` in two configurations — its chemically-weighted
-default, and its documented geometric-only mode (`distance_cutoffs=None, x_diff_weight=0,
-porous_adjustment=False`, closer in spirit to mikiwame's own no-chemical-weighting
-method). Run inside an isolated virtualenv (`.venv-differential-validation/`, gitignored;
-see the script's own header for setup) — does not touch system Python, not wired into
-`cargo test` or CI.
+the `mikiwame` CLI, runs `analyze --format json` on the same five structures
+`tests/known_good_fixtures.rs` uses (identical lattice constants and fractional
+coordinates) — a real subprocess call against the real built binary, not a re-derivation —
+reads `coordination_number` out of each report's actual `local_environment`, and compares
+it against pymatgen's `CrystalNN`, computed on the identical structure, in two
+configurations: `CrystalNN`'s chemically-weighted default, and its documented
+geometric-only mode (`distance_cutoffs=None, x_diff_weight=0, porous_adjustment=False`,
+closer in spirit to mikiwame's own no-chemical-weighting method). Run inside an isolated
+virtualenv (`.venv-differential-validation/`, gitignored; see the script's own header for
+setup) — does not touch system Python, not wired into `cargo test` or CI.
 
-Result: **exact agreement on all 10 site cases across all 5 fixtures**, both CrystalNN
-configurations:
+**This is deliberately end-to-end, not a comparison against a hand-maintained expected-value
+table.** An earlier version of this script hardcoded mikiwame's expected coordination
+numbers in a Python dict and only checked that *those expectations* agreed with pymatgen —
+which would have gone silently stale if `diagnostics::coordination` ever regressed, since
+nothing would re-derive the expectations. Running the actual binary and parsing its actual
+JSON output means a real regression shows up here as a mismatch, not just in `cargo test`.
+
+Result: **exact agreement on all 31 individual sites across all 5 fixtures** (mikiwame
+0.2.0 vs. pymatgen 2026.5.4), both `CrystalNN` configurations — every site checked
+individually, not deduplicated by symmetry:
 
 ```text
-structure    site   mikiwame  CrystalNN(default)  CrystalNN(geometric)  agree?
---------------------------------------------------------------------------------
-NaCl         Na            6                   6                     6  yes
-NaCl         Cl            6                   6                     6  yes
-CsCl         Cs            8                   8                     8  yes
-CsCl         Cl            8                   8                     8  yes
-diamond      C             4                   4                     4  yes
-zinc_blende  Zn            4                   4                     4  yes
-zinc_blende  S             4                   4                     4  yes
-perovskite   Sr           12                  12                    12  yes
-perovskite   Ti            6                   6                     6  yes
-perovskite   O             2                   2                     2  yes
+structure    site element  mikiwame  CrystalNN(default)  CrystalNN(geometric)  agree?
+-------------------------------------------------------------------------------------
+NaCl         0   Na            6                   6                     6  yes
+NaCl         1   Na            6                   6                     6  yes
+NaCl         2   Na            6                   6                     6  yes
+NaCl         3   Na            6                   6                     6  yes
+NaCl         4   Cl            6                   6                     6  yes
+NaCl         5   Cl            6                   6                     6  yes
+NaCl         6   Cl            6                   6                     6  yes
+NaCl         7   Cl            6                   6                     6  yes
+CsCl         0   Cs            8                   8                     8  yes
+CsCl         1   Cl            8                   8                     8  yes
+diamond      0   C             4                   4                     4  yes
+diamond      1   C             4                   4                     4  yes
+diamond      2   C             4                   4                     4  yes
+diamond      3   C             4                   4                     4  yes
+diamond      4   C             4                   4                     4  yes
+diamond      5   C             4                   4                     4  yes
+diamond      6   C             4                   4                     4  yes
+diamond      7   C             4                   4                     4  yes
+zinc_blende  0   Zn            4                   4                     4  yes
+zinc_blende  1   Zn            4                   4                     4  yes
+zinc_blende  2   Zn            4                   4                     4  yes
+zinc_blende  3   Zn            4                   4                     4  yes
+zinc_blende  4   S             4                   4                     4  yes
+zinc_blende  5   S             4                   4                     4  yes
+zinc_blende  6   S             4                   4                     4  yes
+zinc_blende  7   S             4                   4                     4  yes
+perovskite   0   Sr           12                  12                    12  yes
+perovskite   1   Ti            6                   6                     6  yes
+perovskite   2   O             2                   2                     2  yes
+perovskite   3   O             2                   2                     2  yes
+perovskite   4   O             2                   2                     2  yes
+
+mikiwame version: 0.2.0
+pymatgen version: 2026.5.4
+0 mismatch(es) out of 31 sites
 ```
 
 The perovskite-O case is the interesting one: mikiwame reports O as 2-coordinate (its
@@ -206,8 +241,10 @@ substitute for broader validation once CIF input and more diverse fixtures exist
 
 * Broader differential validation: bond distances, symmetry information, oxidation
   states, distortion metrics (AGENTS.md §15.4); a larger/less idealized structure corpus
-  once CIF input exists (blocked on an upstream `chematic-mol` reader — see
-  `tasks/todo.md`).
+  once CIF input exists. `chematic-mol`'s CIF adapter (PR #323) merged to that repo's
+  `main` on 2026-08-14, but predates the `chematic` v0.15.0 release (which shipped
+  earlier the same day) — not yet available in a released `chematic-mol` version. See
+  `tasks/todo.md`.
 * Known-good fixture set beyond the five current structures (CsCl, NaCl, diamond, zinc
   blende, perovskite; AGENTS.md §15.1) — wurtzite/rutile/spinel/graphite are deferred
   pending a cited free-positional-parameter source (see `fixtures/README.md`).

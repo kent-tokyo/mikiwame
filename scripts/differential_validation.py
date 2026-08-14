@@ -1,127 +1,153 @@
 #!/usr/bin/env python3
-"""Differential validation: mikiwame's coordination numbers vs. pymatgen's CrystalNN.
+"""Differential validation: mikiwame's *actual* coordination numbers vs. pymatgen's CrystalNN.
 
 AGENTS.md §15.4 asks for differential comparison against pymatgen/spglib where
-possible. This script covers the coordination-number slice only, on the five
-structures `tests/known_good_fixtures.rs` already treats as known-good in the
-Rust suite (NaCl, CsCl, diamond, zinc blende, ideal cubic perovskite) --
-identical lattice constants and fractional coordinates, so this is a genuine
-comparison, not a re-derivation from a different source.
+possible. This script covers the coordination-number slice: it builds the
+`mikiwame` CLI, runs `analyze --format json` on the same five structures
+`tests/known_good_fixtures.rs` treats as known-good (NaCl, CsCl, diamond, zinc
+blende, ideal cubic perovskite -- identical lattice constants and fractional
+coordinates), reads the *real* `coordination_number` out of each report's
+`local_environment`, and compares it against pymatgen's `CrystalNN` computed
+on the identical structure.
+
+This is deliberately end-to-end, not a comparison against a hand-maintained
+expected-value table: an earlier version of this script hardcoded mikiwame's
+expected coordination numbers and only proved that *those expectations*
+agreed with pymatgen, which would go silently stale if the Rust
+implementation ever regressed. Running the actual built binary and parsing
+its actual output means a real regression in `diagnostics::coordination`
+would show up here as a mismatch, not just in `cargo test`.
 
 Not wired into `cargo test` or CI: this is a Python-based, manually-reproduced
-check, not part of the Rust quality gate. See docs/validation.md for the
-recorded results and how to interpret a disagreement (not necessarily a bug --
-see the perovskite-O note below).
+check, not part of the Rust quality gate. Exits non-zero on any mismatch, so
+it can still be used as a pass/fail gate by hand or in a future CI step.
 
 Setup (isolated virtualenv, does not touch system Python):
     python3 -m venv .venv-differential-validation
     .venv-differential-validation/bin/pip install pymatgen
+    cargo build --bin mikiwame
     .venv-differential-validation/bin/python3 scripts/differential_validation.py
 """
+
+import json
+import subprocess
+import sys
+import tempfile
+import warnings
+from importlib.metadata import version as pkg_version
+from pathlib import Path
 
 from pymatgen.core import Lattice, Structure
 from pymatgen.analysis.local_env import CrystalNN
 
-# mikiwame's own coordination numbers, established (with the underlying
-# geometry hand-verified before implementation) in
-# tests/known_good_fixtures.rs and src/diagnostics/coordination.rs. Keyed by
-# (structure_name, site_label) -> coordination number.
-MIKIWAME_CN = {
-    ("NaCl", "Na"): 6,
-    ("NaCl", "Cl"): 6,
-    ("CsCl", "Cs"): 8,
-    ("CsCl", "Cl"): 8,
-    ("diamond", "C"): 4,
-    ("zinc_blende", "Zn"): 4,
-    ("zinc_blende", "S"): 4,
-    ("perovskite", "Sr"): 12,
-    ("perovskite", "Ti"): 6,
-    ("perovskite", "O"): 2,
-}
+REPO_ROOT = Path(__file__).resolve().parent.parent
+MIKIWAME_BIN = REPO_ROOT / "target" / "debug" / "mikiwame"
 
 
-def nacl():
-    a = 5.6402
-    lattice = Lattice.cubic(a)
-    species = ["Na"] * 4 + ["Cl"] * 4
-    coords = [
-        [0.0, 0.0, 0.0], [0.5, 0.5, 0.0], [0.5, 0.0, 0.5], [0.0, 0.5, 0.5],
-        [0.5, 0.5, 0.5], [0.0, 0.0, 0.5], [0.0, 0.5, 0.0], [0.5, 0.0, 0.0],
-    ]
-    return Structure(lattice, species, coords)
+def structure_fixture(name):
+    """Returns (lattice_matrix, [(element, fractional), ...]) for one fixture,
+    with lattice constants and site positions identical to
+    tests/known_good_fixtures.rs."""
+    if name == "NaCl":
+        a = 5.6402
+        sites = [
+            ("Na", [0.0, 0.0, 0.0]), ("Na", [0.5, 0.5, 0.0]),
+            ("Na", [0.5, 0.0, 0.5]), ("Na", [0.0, 0.5, 0.5]),
+            ("Cl", [0.5, 0.5, 0.5]), ("Cl", [0.0, 0.0, 0.5]),
+            ("Cl", [0.0, 0.5, 0.0]), ("Cl", [0.5, 0.0, 0.0]),
+        ]
+    elif name == "CsCl":
+        a = 4.123
+        sites = [("Cs", [0.0, 0.0, 0.0]), ("Cl", [0.5, 0.5, 0.5])]
+    elif name == "diamond":
+        a = 3.567
+        sites = [
+            ("C", f) for f in [
+                [0.0, 0.0, 0.0], [0.5, 0.5, 0.0], [0.5, 0.0, 0.5], [0.0, 0.5, 0.5],
+                [0.25, 0.25, 0.25], [0.75, 0.75, 0.25], [0.75, 0.25, 0.75], [0.25, 0.75, 0.75],
+            ]
+        ]
+    elif name == "zinc_blende":
+        a = 5.41
+        zn = [[0.0, 0.0, 0.0], [0.5, 0.5, 0.0], [0.5, 0.0, 0.5], [0.0, 0.5, 0.5]]
+        s = [[0.25, 0.25, 0.25], [0.75, 0.75, 0.25], [0.75, 0.25, 0.75], [0.25, 0.75, 0.75]]
+        sites = [("Zn", f) for f in zn] + [("S", f) for f in s]
+    elif name == "perovskite":
+        a = 3.905
+        sites = [
+            ("Sr", [0.0, 0.0, 0.0]), ("Ti", [0.5, 0.5, 0.5]),
+            ("O", [0.5, 0.5, 0.0]), ("O", [0.5, 0.0, 0.5]), ("O", [0.0, 0.5, 0.5]),
+        ]
+    else:
+        raise ValueError(name)
+    lattice = [[a, 0.0, 0.0], [0.0, a, 0.0], [0.0, 0.0, a]]
+    return lattice, sites
 
 
-def cscl():
-    a = 4.123
-    lattice = Lattice.cubic(a)
-    return Structure(lattice, ["Cs", "Cl"], [[0.0, 0.0, 0.0], [0.5, 0.5, 0.5]])
+def run_mikiwame(lattice, sites):
+    """Writes the CLI's JSON structure input, runs `mikiwame analyze --format
+    json`, and returns the parsed report."""
+    structure_json = {
+        "lattice": lattice,
+        "sites": [{"element": el, "fractional": f, "occupancy": 1.0} for el, f in sites],
+    }
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as fh:
+        json.dump(structure_json, fh)
+        input_path = fh.name
+    result = subprocess.run(
+        [str(MIKIWAME_BIN), "analyze", input_path, "--format", "json"],
+        capture_output=True, text=True, check=True,
+    )
+    return json.loads(result.stdout)
 
 
-def diamond():
-    a = 3.567
-    lattice = Lattice.cubic(a)
-    coords = [
-        [0.0, 0.0, 0.0], [0.5, 0.5, 0.0], [0.5, 0.0, 0.5], [0.0, 0.5, 0.5],
-        [0.25, 0.25, 0.25], [0.75, 0.75, 0.25], [0.75, 0.25, 0.75], [0.25, 0.75, 0.75],
-    ]
-    return Structure(lattice, ["C"] * 8, coords)
-
-
-def zinc_blende():
-    a = 5.41
-    lattice = Lattice.cubic(a)
-    zn = [[0.0, 0.0, 0.0], [0.5, 0.5, 0.0], [0.5, 0.0, 0.5], [0.0, 0.5, 0.5]]
-    s = [[0.25, 0.25, 0.25], [0.75, 0.75, 0.25], [0.75, 0.25, 0.75], [0.25, 0.75, 0.75]]
-    return Structure(lattice, ["Zn"] * 4 + ["S"] * 4, zn + s)
-
-
-def perovskite():
-    a = 3.905
-    lattice = Lattice.cubic(a)
-    species = ["Sr", "Ti", "O", "O", "O"]
-    coords = [
-        [0.0, 0.0, 0.0], [0.5, 0.5, 0.5],
-        [0.5, 0.5, 0.0], [0.5, 0.0, 0.5], [0.0, 0.5, 0.5],
-    ]
-    return Structure(lattice, species, coords)
-
-
-STRUCTURES = {
-    "NaCl": nacl(),
-    "CsCl": cscl(),
-    "diamond": diamond(),
-    "zinc_blende": zinc_blende(),
-    "perovskite": perovskite(),
-}
-
-# Default ("chemical bond" style) weighting.
-cnn_default = CrystalNN()
-# Geometric-only mode, per CrystalNN's own docstring: distance_cutoffs=None,
-# x_diff_weight=0, porous_adjustment=False -- closer in spirit to mikiwame's
-# purely geometric (no electronegativity weighting) method.
-cnn_geometric = CrystalNN(distance_cutoffs=None, x_diff_weight=0, porous_adjustment=False)
+def pymatgen_structure(lattice, sites):
+    elements = [el for el, _ in sites]
+    coords = [f for _, f in sites]
+    return Structure(Lattice(lattice), elements, coords)
 
 
 def main():
-    header = f"{'structure':<12} {'site':<5} {'mikiwame':>9} {'CrystalNN(default)':>19} {'CrystalNN(geometric)':>21}  agree?"
+    if not MIKIWAME_BIN.exists():
+        print(f"error: {MIKIWAME_BIN} not built -- run `cargo build --bin mikiwame` first", file=sys.stderr)
+        return 1
+
+    cnn_default = CrystalNN()
+    cnn_geometric = CrystalNN(distance_cutoffs=None, x_diff_weight=0, porous_adjustment=False)
+
+    header = f"{'structure':<12} {'site':<3} {'element':<5} {'mikiwame':>9} {'CrystalNN(default)':>19} {'CrystalNN(geometric)':>21}  agree?"
     print(header)
     print("-" * len(header))
-    for name, structure in STRUCTURES.items():
-        seen_labels = set()
-        for i, site in enumerate(structure):
-            label = site.species_string
-            if label in seen_labels:
-                continue  # one representative site per element is enough (fixtures are symmetric)
-            seen_labels.add(label)
 
-            mikiwame_cn = MIKIWAME_CN[(name, label)]
-            default_cn = round(cnn_default.get_cn(structure, i))
-            geometric_cn = round(cnn_geometric.get_cn(structure, i))
-            agree = "yes" if (mikiwame_cn == default_cn == geometric_cn) else "DIFFERS"
-            print(
-                f"{name:<12} {label:<5} {mikiwame_cn:>9} {default_cn:>19} {geometric_cn:>21}  {agree}"
-            )
+    mismatches = 0
+    mikiwame_version = None
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # expected: no oxidation states set (see docs/validation.md)
+        for name in ["NaCl", "CsCl", "diamond", "zinc_blende", "perovskite"]:
+            lattice, sites = structure_fixture(name)
+            report = run_mikiwame(lattice, sites)
+            mikiwame_version = report["provenance"]["mikiwame_version"]
+            cn_by_site = {e["site_index"]: e["coordination_number"] for e in report["local_environment"]}
+            pmg = pymatgen_structure(lattice, sites)
+
+            for i, (element, _) in enumerate(sites):
+                mikiwame_cn = cn_by_site.get(i)
+                default_cn = round(cnn_default.get_cn(pmg, i))
+                geometric_cn = round(cnn_geometric.get_cn(pmg, i))
+                agree = mikiwame_cn == default_cn == geometric_cn
+                if not agree:
+                    mismatches += 1
+                print(
+                    f"{name:<12} {i:<3} {element:<5} {mikiwame_cn!s:>9} {default_cn:>19} "
+                    f"{geometric_cn:>21}  {'yes' if agree else 'MISMATCH'}"
+                )
+
+    print()
+    print(f"mikiwame version: {mikiwame_version}")
+    print(f"pymatgen version: {pkg_version('pymatgen')}")
+    print(f"{mismatches} mismatch(es) out of {sum(len(structure_fixture(n)[1]) for n in ['NaCl', 'CsCl', 'diamond', 'zinc_blende', 'perovskite'])} sites")
+    return 1 if mismatches else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
