@@ -97,9 +97,20 @@
       perovskite) because each needs at least one free internal positional parameter
       (or, for graphite, was deferred alongside them for consistency) sourced from a
       citation rather than memory. See `fixtures/README.md`.
-- [ ] Phase 6: differential comparison against pymatgen/spglib (no Python materials
-      stack is installed in the dev environment used so far — see `docs/validation.md`),
-      benchmark report.
+- [ ] Phase 6: broader differential comparison against pymatgen/spglib — coordination
+      number is done (`scripts/differential_validation.py`, `docs/validation.md`); bond
+      distances, symmetry info, oxidation states, and distortion metrics (AGENTS.md §15.4)
+      are not, and a real (non-idealized) structure corpus needs CIF input first.
+      Benchmark report also not started.
+- [ ] Fixture definitions are duplicated by hand in two places —
+      `tests/known_good_fixtures.rs` and `scripts/differential_validation.py`'s
+      `structure_fixture()` — with a comment asserting they're identical but nothing
+      that enforces it; either could drift without the other noticing. Not fixed this
+      round (not required for the differential-validation fix that prompted noticing
+      it). Candidate direction: shared JSON fixture files (e.g.
+      `fixtures/structures/{nacl,cscl,diamond,zinc_blende,perovskite}.json`) that both
+      the Rust tests and the Python script load, and that a future CIF round-trip test
+      could also reuse.
 - [ ] CLI exit codes are currently just 0 (ran) / 1 (usage or I/O error) and don't reflect
       `Verdict` (e.g. for CI gating on `StrongAnomalyDetected`). Left alone rather than
       guessed at: that's a genuine product decision (different callers would want
@@ -232,3 +243,13 @@
       exits non-zero on any mismatch, and records both the mikiwame and pymatgen versions
       actually used in its output. Result unchanged: 0 mismatches. See
       `docs/validation.md`.
+- [x] Closed a real gap in the "end-to-end" claim above: the script checked that
+      `target/debug/mikiwame` *existed* but never actually rebuilt it, so a stale binary
+      from an earlier `cargo build` could report false agreement after a real regression
+      in `diagnostics::coordination` — the commit message claimed the CLI was built; the
+      code didn't do that yet. `scripts/differential_validation.py` now runs
+      `cargo build --bin mikiwame` (`cwd=REPO_ROOT, check=True`) at the start of every
+      invocation. Also switched the per-fixture input JSON from
+      `NamedTemporaryFile(delete=False)` (leaked a file per run) to
+      `tempfile.TemporaryDirectory()` (cleaned up automatically). Re-ran after both fixes:
+      still 0 mismatches out of 31 sites, mikiwame 0.2.0 / pymatgen 2026.5.4.

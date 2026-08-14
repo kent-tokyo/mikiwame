@@ -22,10 +22,11 @@ Not wired into `cargo test` or CI: this is a Python-based, manually-reproduced
 check, not part of the Rust quality gate. Exits non-zero on any mismatch, so
 it can still be used as a pass/fail gate by hand or in a future CI step.
 
-Setup (isolated virtualenv, does not touch system Python):
+Setup (isolated virtualenv, does not touch system Python). This script rebuilds
+`mikiwame` itself (`cargo build --bin mikiwame`) every run, so the venv only
+needs pymatgen:
     python3 -m venv .venv-differential-validation
     .venv-differential-validation/bin/pip install pymatgen
-    cargo build --bin mikiwame
     .venv-differential-validation/bin/python3 scripts/differential_validation.py
 """
 
@@ -84,6 +85,13 @@ def structure_fixture(name):
     return lattice, sites
 
 
+def build_mikiwame():
+    """Rebuilds the CLI from the current checkout. Without this, a stale
+    target/debug/mikiwame from a previous build could silently pass this
+    script even after a real regression in diagnostics::coordination."""
+    subprocess.run(["cargo", "build", "--bin", "mikiwame"], cwd=REPO_ROOT, check=True)
+
+
 def run_mikiwame(lattice, sites):
     """Writes the CLI's JSON structure input, runs `mikiwame analyze --format
     json`, and returns the parsed report."""
@@ -91,13 +99,13 @@ def run_mikiwame(lattice, sites):
         "lattice": lattice,
         "sites": [{"element": el, "fractional": f, "occupancy": 1.0} for el, f in sites],
     }
-    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as fh:
-        json.dump(structure_json, fh)
-        input_path = fh.name
-    result = subprocess.run(
-        [str(MIKIWAME_BIN), "analyze", input_path, "--format", "json"],
-        capture_output=True, text=True, check=True,
-    )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        input_path = Path(tmpdir) / "structure.json"
+        input_path.write_text(json.dumps(structure_json), encoding="utf-8")
+        result = subprocess.run(
+            [str(MIKIWAME_BIN), "analyze", str(input_path), "--format", "json"],
+            cwd=REPO_ROOT, capture_output=True, text=True, check=True,
+        )
     return json.loads(result.stdout)
 
 
@@ -108,8 +116,9 @@ def pymatgen_structure(lattice, sites):
 
 
 def main():
+    build_mikiwame()
     if not MIKIWAME_BIN.exists():
-        print(f"error: {MIKIWAME_BIN} not built -- run `cargo build --bin mikiwame` first", file=sys.stderr)
+        print(f"error: build succeeded but binary is missing: {MIKIWAME_BIN}", file=sys.stderr)
         return 1
 
     cnn_default = CrystalNN()
