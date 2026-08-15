@@ -235,15 +235,17 @@ structures. Not covered: bond distances, symmetry/space-group information, oxida
 states, distortion metrics (AGENTS.md §15.4 lists these too), skewed/low-symmetry
 structures, real experimental CIFs, or a benchmark corpus. A single clean agreement across
 5 textbook structures is meaningful evidence the method isn't obviously wrong, not a
-substitute for broader validation once CIF input and more diverse fixtures exist.
+substitute for broader validation against a real, non-idealized corpus.
 
 ## Not yet done
 
 * Broader differential validation: bond distances, symmetry information, oxidation
-  states, distortion metrics (AGENTS.md §15.4); a larger/less idealized structure corpus
-  once CIF input exists. `chematic-mol`'s CIF adapter (PR #323) merged to that repo's
-  `main` on 2026-08-14, but predates the `chematic` v0.15.0 release (which shipped
-  earlier the same day) — not yet available in a released `chematic-mol` version. See
+  states, distortion metrics (AGENTS.md §15.4); a larger/less idealized structure corpus.
+  CIF input itself shipped (0.3.0/0.3.1, `src/cif.rs`) and is no longer the blocker, but
+  mikiwame only accepts P1 (or already-expanded) CIFs — it rejects any CIF declaring
+  symmetry beyond P1 outright rather than analyzing an incomplete asymmetric unit (see
+  `docs/chematic-prerequisites.md`'s 2026-08-15 addendum) — so a broader corpus is itself
+  scoped to P1-only structures until real symmetry expansion lands upstream. See
   `tasks/todo.md`.
 * Known-good fixture set beyond the five current structures (CsCl, NaCl, diamond, zinc
   blende, perovskite; AGENTS.md §15.1) — wurtzite/rutile/spinel/graphite are deferred

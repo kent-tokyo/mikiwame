@@ -1,8 +1,10 @@
 # Fixtures
 
-No external data files ship in v0.1 (CIF reading is not implemented yet — see
-`tasks/todo.md`). All fixtures are built directly in Rust, in `tests/diagnostics.rs`,
-`tests/metamorphic.rs`, and `tests/known_good_fixtures.rs`.
+No external data files ship here yet. CIF *input* exists since 0.3.0 (optional `cif`
+feature, `src/cif.rs`), but these test fixtures are still built directly in Rust, in
+`tests/diagnostics.rs`, `tests/metamorphic.rs`, and `tests/known_good_fixtures.rs` — a
+candidate direction to load them (and `scripts/differential_validation.py`'s duplicate
+copies) from shared fixture files instead is recorded in `tasks/todo.md`, not decided.
 
 ## Known-good structures
 

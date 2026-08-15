@@ -111,8 +111,10 @@
 - [ ] Phase 6: broader differential comparison against pymatgen/spglib — coordination
       number is done (`scripts/differential_validation.py`, `docs/validation.md`); bond
       distances, symmetry info, oxidation states, and distortion metrics (AGENTS.md §15.4)
-      are not, and a real (non-idealized) structure corpus needs CIF input first.
-      Benchmark report also not started.
+      are not. A real (non-idealized) structure corpus is no longer blocked on CIF input
+      itself (that shipped in 0.3.0/0.3.1) — see the "Broader CIF differential validation"
+      item above for the current, more specific blocker (P1-only scope until non-P1
+      symmetry expansion lands). Benchmark report also not started.
 - [ ] Fixture definitions are duplicated by hand in two places —
       `tests/known_good_fixtures.rs` and `scripts/differential_validation.py`'s
       `structure_fixture()` — with a comment asserting they're identical but nothing
