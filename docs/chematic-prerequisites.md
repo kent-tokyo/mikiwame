@@ -47,6 +47,69 @@ are structurally unreachable on the CIF input path — `INPUT_UNKNOWN_ELEMENT`,
 trigger any of them fails to parse at all. See `src/cif.rs`'s module doc comment and
 `tasks/todo.md`.
 
+## Update (2026-08-15): non-P1 CIF rejected, not analyzed (0.3.0 → 0.3.1)
+
+`chematic-crystal`'s own crate doc comment states it is out of scope for "symmetry (space
+groups, Wyckoff positions, Niggli reduction)", and `chematic-mol`'s CIF adapter confirms
+this at the CIF level: `CifSymmetryStatus::UnexpandedSymmetry` exists specifically because
+symmetry operations are never expanded, but the adapter only exposes an `operation_count`
+for a declared symop loop — not the operator strings themselves (e.g. `-x, y, -z+1/2`).
+
+0.3.0 shipped treating this as a warning: the CLI printed a note to stderr and proceeded to
+analyze the asymmetric-unit-only sites as if they were the complete cell. This was wrong —
+`analyze`'s default output is JSON on stdout, so an automated caller reading only stdout
+(the normal case for a machine-readable diagnostic tool) never saw the warning and got a
+confidently wrong report (coordination numbers and near-neighbor distances computed from an
+incomplete structure). 0.3.1 rejects non-P1 CIF input outright instead (`src/cif.rs`'s
+`read_cif` is unchanged and still returns `CifSymmetryStatus` either way — only the CLI's
+policy changed, in `src/bin/mikiwame.rs::read_cif_structure`). See `CHANGELOG.md`.
+
+**Requested chematic types (for a future PR — not implemented here, same status as every
+other item in this document)**, to make real symmetry expansion possible without mikiwame
+re-implementing CIF symmetry-loop parsing or a space-group table itself:
+
+```rust
+// chematic-crystal: a typed symmetry operation and its application —
+// no space-group database needed, just the operator as literally given.
+pub struct SymmetryOperation {
+    pub rotation: [[i32; 3]; 3],
+    pub translation: [Rational; 3], // exact fractions, e.g. 1/2, 1/4
+}
+
+impl SymmetryOperation {
+    pub fn apply(&self, coord: FractionalCoord) -> FractionalCoord;
+}
+
+// Applies every operation to every asymmetric-unit site, wraps into [0,1),
+// deduplicates special positions, and merges species/occupancy at sites the
+// operations map onto each other -- the parts that make this more than a
+// "small symop-string parser" (exact affine-expression parsing, special-
+// position dedup, disorder-aware merging, fail-closed on a malformed
+// operator) and therefore not something to build inside mikiwame itself.
+pub fn expand_asymmetric_unit(
+    structure: &PeriodicStructure,
+    operations: &[SymmetryOperation],
+    tolerance: f64,
+) -> Result<PeriodicStructure, CrystalError>;
+```
+
+```rust
+// chematic-mol: parse a CIF's symop loop (modern or legacy tag) into
+// SymmetryOperation instead of only counting rows.
+pub struct CifPeriodicResult {
+    pub structure: PeriodicStructure,
+    pub symmetry: CifSymmetryStatus,
+    pub symmetry_operations: Vec<SymmetryOperation>, // empty when P1
+}
+```
+
+With this, mikiwame's own symmetry handling would be exactly
+`chematic_crystal::expand_asymmetric_unit(&result.structure, &result.symmetry_operations, tol)`
+— no CIF or symmetry-operator syntax of its own. Not proposed as an actual PR to
+`kent-tokyo/chematic` yet (no open issue exists for it, unlike the CIF adapter itself,
+which had an already-merged PR waiting only on a release) — recorded here so the shape is
+decided ahead of time, same as this document's other "requested types" sections.
+
 The rest of this document is the original Phase 0 finding, left as-is for history.
 
 ## Finding (Phase 0 investigation, 2026-08-13)

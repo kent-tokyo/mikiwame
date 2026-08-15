@@ -76,9 +76,10 @@ cargo run --bin mikiwame -- doctor
 cli,cif`（または`cargo install mikiwame --features cif`）。`cli`と違い`cif`はデフォルトでは
 無効です — `chematic-mol`の依存クレート一式を引き込むためです。`chematic-mol`が解析・
 検証できないCIF（occupancyの不備、cellパラメータ不足など）はレポートではなくCLIエラーに
-なります。P1を超える対称性を宣言したCIFは（警告付きで）受け付けますが、対称操作を展開
-しないため非対称単位のみである点に注意してください。`batch`はJSONL専用のままです。
-`doctor`はCIFサポートが組み込まれているかどうかを報告します。
+なります。P1を超える対称性を宣言したCIFも同様にCLIエラーとして拒否します — `chematic-mol`
+は対称操作を展開しないため、非対称単位だけを完全なunit cellとして解析すると配位数や
+近接距離を誤って報告してしまうためです。そのようなCIFは事前にP1へ展開してください。
+`batch`はJSONL専用のままです。`doctor`はCIFサポートが組み込まれているかどうかを報告します。
 
 ## `chematic`との関係
 

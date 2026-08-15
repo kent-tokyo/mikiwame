@@ -19,8 +19,13 @@
 //! `analyze` also accepts a `.cif` path (case-insensitive extension match)
 //! when built with the `cif` feature, via [`mikiwame::cif`]. A CIF
 //! `chematic-mol` cannot parse or validate is a CLI error, not a diagnosed
-//! report — see that module's doc comment for why. `batch` stays JSONL-only:
-//! a CIF file isn't line-oriented multi-structure data.
+//! report — see that module's doc comment for why. A CIF declaring symmetry
+//! beyond P1 is also rejected outright (CLI error, no report generated):
+//! `chematic-mol` never expands symmetry operations, so the returned sites
+//! would only be the asymmetric unit, not the complete unit cell, and
+//! analyzing it as if it were complete would misreport coordination numbers
+//! and near-neighbor distances. `batch` stays JSONL-only: a CIF file isn't
+//! line-oriented multi-structure data.
 
 use std::env;
 use std::fs;
@@ -86,18 +91,19 @@ fn read_structure_file(path: &str) -> Result<OwnedStructure, String> {
 #[cfg(feature = "cif")]
 fn read_cif_structure(path: &str, text: &str) -> Result<OwnedStructure, String> {
     let cif = mikiwame::cif::read_cif(text).map_err(|e| format!("parsing {path}: {e}"))?;
-    if let mikiwame::cif::CifSymmetryStatus::UnexpandedSymmetry {
-        space_group_name,
-        operation_count,
-    } = &cif.symmetry
-    {
-        eprintln!(
-            "warning: {path} declares symmetry beyond P1 ({}, {operation_count} operation(s)) \
-             that was not expanded; sites are the asymmetric unit only, not the full unit cell",
+    match cif.symmetry {
+        mikiwame::cif::CifSymmetryStatus::P1 => Ok(cif.structure),
+        mikiwame::cif::CifSymmetryStatus::UnexpandedSymmetry {
+            space_group_name,
+            operation_count,
+        } => Err(format!(
+            "{path}: declares symmetry beyond P1 ({}, {operation_count} operation(s)) that \
+             mikiwame does not expand; analyzing only the asymmetric unit would misreport \
+             coordination numbers and near-neighbor distances. Export/expand this CIF to P1 \
+             before analyzing it with mikiwame.",
             space_group_name.as_deref().unwrap_or("unnamed space group"),
-        );
+        )),
     }
-    Ok(cif.structure)
 }
 
 #[cfg(not(feature = "cif"))]
@@ -231,9 +237,10 @@ fn cmd_doctor() {
     );
     if cfg!(feature = "cif") {
         println!(
-            "CIF input: enabled (chematic-mol 0.16.0 parse_cif_periodic_structure; symmetry \
-             not expanded — see docs/chematic-prerequisites.md); .cif paths accepted by \
-             analyze/batch, malformed CIFs are a CLI error, not a diagnosed report"
+            "CIF input: enabled (chematic-mol 0.16.0 parse_cif_periodic_structure); .cif \
+             paths accepted by analyze; malformed CIFs and non-P1 CIFs (symmetry not \
+             expanded — see docs/chematic-prerequisites.md) are both a CLI error, not a \
+             diagnosed report"
         );
     } else {
         println!("CIF input: not compiled in (rebuild with --features cif)");
@@ -373,5 +380,44 @@ mod tests {
         let markdown = render_markdown(&report);
         assert!(markdown.contains("ReviewRecommended"));
         assert!(markdown.contains("INPUT_UNKNOWN_ELEMENT"));
+    }
+
+    #[cfg(feature = "cif")]
+    const P1_CIF: &str = "data_NaCl\n\
+        _cell_length_a 5.6402\n_cell_length_b 5.6402\n_cell_length_c 5.6402\n\
+        _cell_angle_alpha 90\n_cell_angle_beta 90\n_cell_angle_gamma 90\n\
+        loop_\n\
+        _atom_site_label\n_atom_site_type_symbol\n\
+        _atom_site_fract_x\n_atom_site_fract_y\n_atom_site_fract_z\n\
+        Na1 Na 0.0 0.0 0.0\n\
+        Cl1 Cl 0.5 0.5 0.5\n";
+
+    #[cfg(feature = "cif")]
+    const NON_P1_CIF: &str = "data_symmetry_test\n\
+        _cell_length_a 4.0\n_cell_length_b 4.0\n_cell_length_c 4.0\n\
+        _cell_angle_alpha 90\n_cell_angle_beta 90\n_cell_angle_gamma 90\n\
+        _symmetry_Int_Tables_number 15\n\
+        loop_\n\
+        _atom_site_label\n_atom_site_type_symbol\n\
+        _atom_site_fract_x\n_atom_site_fract_y\n_atom_site_fract_z\n\
+        Ti1 Ti 0.0 0.25 0.25\n";
+
+    #[cfg(feature = "cif")]
+    #[test]
+    fn read_cif_structure_accepts_p1() {
+        use mikiwame::PeriodicStructureView;
+        let structure = read_cif_structure("nacl.cif", P1_CIF).expect("P1 CIF must parse");
+        assert_eq!(structure.sites().len(), 2);
+    }
+
+    #[cfg(feature = "cif")]
+    #[test]
+    fn read_cif_structure_rejects_unexpanded_symmetry() {
+        let err = read_cif_structure("symmetry.cif", NON_P1_CIF)
+            .expect_err("non-P1 CIF must be rejected, not silently analyzed as-is");
+        assert!(
+            err.contains("does not expand"),
+            "error should explain why the CIF was rejected, got: {err}"
+        );
     }
 }

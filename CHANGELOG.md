@@ -4,6 +4,17 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-08-15
+
+### Fixed
+
+- 0.3.0 was yanked: the CLI warned but continued analyzing non-P1 CIF files whose symmetry
+  operations had not been expanded, potentially producing diagnostics from the asymmetric
+  unit rather than the complete unit cell. 0.3.1 now rejects such inputs. This was
+  invisible to any caller that only read `analyze`'s default stdout JSON output, since the
+  warning was stderr-only. The library-level `mikiwame::cif::read_cif` is unchanged — it
+  still reports `CifSymmetryStatus` either way; only the CLI's policy changed.
+
 ## [0.3.0] - 2026-08-15
 
 ### Added

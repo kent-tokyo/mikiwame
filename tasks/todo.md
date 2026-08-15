@@ -55,6 +55,31 @@
       "site 3", not "site Na1". Not CIF-specific (JSON input never had labels either);
       adding a `label` field to `Site` is a breaking change (public fields, no constructor)
       that needs its own decision, not bundled into the CIF round.
+- [ ] Non-P1 CIF symmetry expansion: mikiwame 0.3.1 rejects any CIF declaring symmetry
+      beyond P1 outright (see "Done this round" below) rather than expanding it — expansion
+      itself needs chematic to expose typed symmetry operations (not just an operation
+      count), which doesn't exist yet on either the CIF side or as a proposal (no open
+      chematic issue/PR, unlike the CIF adapter's own history). Requested shape recorded in
+      `docs/chematic-prerequisites.md`'s 2026-08-15 addendum
+      (`SymmetryOperation`/`expand_asymmetric_unit`). Deliberately not something mikiwame
+      builds itself — real expansion needs exact affine-expression parsing, `[0,1)`
+      wrapping, special-position dedup, and disorder-aware species merging, which is a
+      crystal-symmetry engine, not a small CIF-adapter addition, and would duplicate
+      chematic-mol's own (private) CIF symop-loop parsing to boot.
+- [ ] Broader CIF differential validation: mikiwame's 5 known-good fixtures are idealized,
+      not real experimental data. The Crystallography Open Database (COD,
+      crystallography.net) is CC0/public-domain with an open REST API and bulk CIF
+      download — no licensing concern — and is the natural source for a real corpus. Scope
+      is necessarily P1-only (or pre-expanded-to-P1) until the symmetry-expansion item
+      above is resolved, since most COD entries declare non-P1 symmetry and mikiwame now
+      rejects those outright. Not started: needs a corpus-fetching/curation script (new,
+      distinct from `scripts/differential_validation.py`, which builds its 5 fixtures
+      programmatically rather than from real CIF files) and a decision on corpus size.
+- [ ] `Provenance` has no field recording "this report's input was read from a CIF and
+      analyzed as P1" — would help a report consumer distinguish a JSON-constructed
+      structure from a CIF-derived one after the fact. `Provenance` is `#[non_exhaustive]`
+      with a constructor (`Provenance::current`), so this is a non-breaking addition
+      whenever it's prioritized; not bundled into the 0.3.1 correctness-fix round.
 - [ ] Out-of-domain applicability detection (surfaces/interfaces/amorphous/polymers,
       AGENTS.md §5): `analyze` currently always reports `ApplicabilityLevel::FullyApplicable`
       for any input that passes input-quality checks. Parked here rather than implemented:
@@ -280,3 +305,17 @@
       see the two new entries in the "Needs a cited source" section above): three
       finding codes structurally unreachable on the CIF path, and CIF site labels
       (e.g. "Na1") dropped since `Site` has no label field.
+- [x] Fixed a real correctness bug in 0.3.0, released as 0.3.1 (0.3.0 yanked):
+      `read_cif_structure` (`src/bin/mikiwame.rs`) printed a stderr warning on
+      `CifSymmetryStatus::UnexpandedSymmetry` and then analyzed the asymmetric-unit-only
+      sites as if they were the complete cell — since `analyze`'s default output is JSON
+      on stdout, an automated caller reading only stdout never saw the warning and got a
+      confidently wrong report (misreported coordination numbers / near-neighbor
+      distances). Now a non-P1 CIF is a CLI error, same as a CIF `chematic-mol` can't
+      parse or validate — no report generated. `mikiwame::cif::read_cif` (library level)
+      is unchanged: it still returns `CifSymmetryStatus` either way, so a caller doing its
+      own symmetry handling isn't blocked; only the CLI's policy changed. See
+      `docs/chematic-prerequisites.md`'s 2026-08-15 addendum for the typed
+      `SymmetryOperation`/`expand_asymmetric_unit` API this would need from chematic to
+      implement real expansion (not proposed as an actual chematic PR yet — no open
+      issue exists for it).

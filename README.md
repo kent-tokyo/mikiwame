@@ -76,9 +76,11 @@ structure.cif`), when built with the optional `cif` feature: `cargo build --feat
 cli,cif` (or `cargo install mikiwame --features cif`). `cif` is not on by default — unlike
 `cli`, it pulls in `chematic-mol`'s full dependency tree. A CIF that `chematic-mol` cannot
 parse or validate (bad occupancy, missing cell parameters, etc.) is a CLI error, not a
-diagnosed report; a CIF declaring symmetry beyond P1 is accepted (with a warning) but is
-only the asymmetric unit, since symmetry operations are not expanded. `batch` stays
-JSONL-only. `doctor` reports whether CIF support is compiled in.
+diagnosed report; a CIF declaring symmetry beyond P1 is rejected outright (also a CLI
+error) rather than analyzed, since `chematic-mol` never expands symmetry operations —
+analyzing just the asymmetric unit as if it were the complete cell would misreport
+coordination numbers and near-neighbor distances. Export/expand such a CIF to P1 first.
+`batch` stays JSONL-only. `doctor` reports whether CIF support is compiled in.
 
 ## Relationship to `chematic`
 
