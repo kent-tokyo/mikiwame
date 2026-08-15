@@ -15,6 +15,12 @@
 //!
 //! `batch` reads one such JSON object per line (JSONL) and writes one
 //! [`MaterialDiagnosticReport`] JSON object per line.
+//!
+//! `analyze` also accepts a `.cif` path (case-insensitive extension match)
+//! when built with the `cif` feature, via [`mikiwame::cif`]. A CIF
+//! `chematic-mol` cannot parse or validate is a CLI error, not a diagnosed
+//! report — see that module's doc comment for why. `batch` stays JSONL-only:
+//! a CIF file isn't line-oriented multi-structure data.
 
 use std::env;
 use std::fs;
@@ -69,9 +75,36 @@ fn flag<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
 
 fn read_structure_file(path: &str) -> Result<OwnedStructure, String> {
     let text = fs::read_to_string(path).map_err(|e| format!("reading {path}: {e}"))?;
+    if path.to_ascii_lowercase().ends_with(".cif") {
+        return read_cif_structure(path, &text);
+    }
     let file: StructureFile =
         serde_json::from_str(&text).map_err(|e| format!("parsing {path}: {e}"))?;
     Ok(OwnedStructure::new(file.lattice, file.sites))
+}
+
+#[cfg(feature = "cif")]
+fn read_cif_structure(path: &str, text: &str) -> Result<OwnedStructure, String> {
+    let cif = mikiwame::cif::read_cif(text).map_err(|e| format!("parsing {path}: {e}"))?;
+    if let mikiwame::cif::CifSymmetryStatus::UnexpandedSymmetry {
+        space_group_name,
+        operation_count,
+    } = &cif.symmetry
+    {
+        eprintln!(
+            "warning: {path} declares symmetry beyond P1 ({}, {operation_count} operation(s)) \
+             that was not expanded; sites are the asymmetric unit only, not the full unit cell",
+            space_group_name.as_deref().unwrap_or("unnamed space group"),
+        );
+    }
+    Ok(cif.structure)
+}
+
+#[cfg(not(feature = "cif"))]
+fn read_cif_structure(path: &str, _text: &str) -> Result<OwnedStructure, String> {
+    Err(format!(
+        "{path}: CIF input requires the 'cif' feature — rebuild/reinstall with `--features cif`"
+    ))
 }
 
 fn cmd_analyze(args: &[String]) -> Result<(), String> {
@@ -185,13 +218,26 @@ fn cmd_doctor() {
     println!("mikiwame version: {}", env!("CARGO_PKG_VERSION"));
     println!("schema version: {}", mikiwame::SCHEMA_VERSION);
     println!(
-        "chematic: chematic-crystal 0.15.0 (periodic geometry: minimum-image distance, \
+        "chematic: chematic-crystal 0.16.0 (periodic geometry: minimum-image distance, \
          neighbor search); PeriodicStructureView stays mikiwame's own input boundary — see \
          docs/chematic-prerequisites.md"
     );
     // This binary only exists when the `cli` feature is enabled
-    // (required-features in Cargo.toml), so it's necessarily on here.
-    println!("enabled features: cli");
+    // (required-features in Cargo.toml), so it's necessarily on here; `cif`
+    // is genuinely optional and checked below.
+    println!(
+        "enabled features: cli{}",
+        if cfg!(feature = "cif") { ", cif" } else { "" }
+    );
+    if cfg!(feature = "cif") {
+        println!(
+            "CIF input: enabled (chematic-mol 0.16.0 parse_cif_periodic_structure; symmetry \
+             not expanded — see docs/chematic-prerequisites.md); .cif paths accepted by \
+             analyze/batch, malformed CIFs are a CLI error, not a diagnosed report"
+        );
+    } else {
+        println!("CIF input: not compiled in (rebuild with --features cif)");
+    }
     println!(
         "radius table: cordero-2008-table2, used by the coordination component's neighbor \
          cutoff; SITE_SEVERE_OVERLAP / SITE_UNUSUALLY_SHORT_DISTANCE still not implemented \

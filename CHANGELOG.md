@@ -4,6 +4,37 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-15
+
+### Added
+
+- CIF file input, behind a new optional `cif` Cargo feature (not in `default` — unlike
+  `cli`, it pulls in `chematic-mol`'s full dependency tree). `mikiwame::cif::read_cif`
+  parses a CIF via `chematic-mol` 0.16.0's occupancy/disorder-preserving
+  `parse_cif_periodic_structure` adapter and converts it into mikiwame's own
+  `OwnedStructure`. The CLI's `analyze` accepts a `.cif` path directly (extension-based
+  detection); `batch` stays JSONL-only. A CIF `chematic-mol` cannot parse or validate
+  (bad occupancy, missing cell parameters, etc.) is a CLI error, not a diagnosed
+  `InvalidInput` report — a deliberate first-cut scope decision, see `src/cif.rs`'s
+  module doc comment. A CIF declaring symmetry beyond P1 is accepted (symmetry
+  operations are not expanded) with a warning, since the returned sites are then only
+  the asymmetric unit. `doctor` reports whether CIF support is compiled in.
+
+### Changed
+
+- `chematic-core`/`chematic-crystal` bumped to 0.16.0 (required by `chematic-mol`
+  0.16.0's `crystal` feature).
+
+### Known limitations
+
+- Three finding codes are structurally unreachable on the CIF input path
+  (`INPUT_UNKNOWN_ELEMENT`, `INPUT_INVALID_OCCUPANCY`,
+  `DISORDER_OCCUPANCY_SUM_EXCEEDS_ONE`) — `chematic-mol` rejects the CIF before mikiwame
+  ever constructs a structure from it. Use the JSON input path for diagnosis of a
+  malformed structure.
+- CIF site labels (e.g. `"Na1"`) are dropped — mikiwame's `Site` has no label field, so
+  CIF-sourced findings reference sites by index only, same as JSON input.
+
 ## [0.2.1] - 2026-08-15
 
 ### Added

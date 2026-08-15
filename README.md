@@ -50,7 +50,9 @@ duplicated-site NaCl: StrongAnomalyDetected
 
 `analyze` takes anything implementing [`PeriodicStructureView`](src/structure_view.rs) —
 your own structure type, or [`OwnedStructure`](src/structure_view.rs) for direct
-construction. There is no CIF reader yet (see below).
+construction. With the optional `cif` feature, [`mikiwame::cif::read_cif`](src/cif.rs)
+parses a CIF file into an `OwnedStructure` via `chematic-mol`'s occupancy/disorder-preserving
+adapter — see that module's doc comment for what it does and does not diagnose.
 
 ## CLI
 
@@ -65,10 +67,18 @@ cargo run --bin mikiwame -- doctor
 `structure.json` (and each line of `structures.jsonl`) is `{"lattice": [[..],[..],[..]],
 "sites": [{"element": "Na", "fractional": [0.0,0.0,0.0], "occupancy": 1.0}, ...]}` — see
 [`src/bin/mikiwame.rs`](src/bin/mikiwame.rs)'s module doc comment. This is a CLI-local
-schema, independent of the report's `schema_version`; there is no CIF reader yet, so this
-is the only supported file input. The CLI lives behind the `cli` Cargo feature (on by
-default; `cargo build --no-default-features` gives a pure-library build without pulling
-in `serde_json`).
+schema, independent of the report's `schema_version`. The CLI lives behind the `cli` Cargo
+feature (on by default; `cargo build --no-default-features` gives a pure-library build
+without pulling in `serde_json`).
+
+`analyze` also accepts a `.cif` path directly (`cargo run --bin mikiwame -- analyze
+structure.cif`), when built with the optional `cif` feature: `cargo build --features
+cli,cif` (or `cargo install mikiwame --features cif`). `cif` is not on by default — unlike
+`cli`, it pulls in `chematic-mol`'s full dependency tree. A CIF that `chematic-mol` cannot
+parse or validate (bad occupancy, missing cell parameters, etc.) is a CLI error, not a
+diagnosed report; a CIF declaring symmetry beyond P1 is accepted (with a warning) but is
+only the asymmetric unit, since symmetry operations are not expanded. `batch` stays
+JSONL-only. `doctor` reports whether CIF support is compiled in.
 
 ## Relationship to `chematic`
 
@@ -83,10 +93,9 @@ reasoning.
 
 ## Not yet implemented
 
-CIF/file I/O (blocked on an upstream `chematic-mol` reader, not built here — see
-[`AGENTS.md`](AGENTS.md)'s stance on not reimplementing CIF infrastructure), polyhedral
-distortion, composition/oxidation-state diagnostics, and any threshold-based check that
-would need an uncited constant ("extreme" lattice aspect ratio, oxidation-state tables).
+Polyhedral distortion, composition/oxidation-state diagnostics, and any threshold-based
+check that would need an uncited constant ("extreme" lattice aspect ratio, oxidation-state
+tables).
 
 Disorder's no-threshold subset (`DISORDER_PRESENT`, `DISORDER_OCCUPANCY_SUM_EXCEEDS_ONE`)
 and coordination number / local environment (`MaterialDiagnosticReport::local_environment`,

@@ -49,7 +49,10 @@ duplicated-site NaCl: StrongAnomalyDetected
 
 `analyze`は[`PeriodicStructureView`](src/structure_view.rs)を実装した任意の型を受け取り
 ます。自前の構造体、または直接構築用の[`OwnedStructure`](src/structure_view.rs)が使えます。
-CIF読み込みはまだありません（下記参照）。
+オプションの`cif` featureを有効にすると、[`mikiwame::cif::read_cif`](src/cif.rs)が
+`chematic-mol`のoccupancy/disorderを保持するアダプタ経由でCIFファイルを`OwnedStructure`
+へ変換します — 何を診断でき何を診断できないかはそのモジュールのdocコメントを参照して
+ください。
 
 ## CLI
 
@@ -65,9 +68,17 @@ cargo run --bin mikiwame -- doctor
 "sites": [{"element": "Na", "fractional": [0.0,0.0,0.0], "occupancy": 1.0}, ...]}`という
 形式です。詳細は[`src/bin/mikiwame.rs`](src/bin/mikiwame.rs)のモジュールdocコメントを
 参照してください。これはCLI専用のスキーマであり、レポートの`schema_version`とは独立して
-います（まだCIFリーダーがないため、現状これが唯一サポートされているファイル入力です）。
-CLIは`cli` Cargo feature（デフォルトで有効）の裏にあります。`cargo build
+います。CLIは`cli` Cargo feature（デフォルトで有効）の裏にあります。`cargo build
 --no-default-features`とすると`serde_json`を含まない純粋なライブラリビルドになります。
+
+`analyze`はオプションの`cif` featureを有効にすると`.cif`パスも直接受け付けます
+（`cargo run --bin mikiwame -- analyze structure.cif`）。有効化は`cargo build --features
+cli,cif`（または`cargo install mikiwame --features cif`）。`cli`と違い`cif`はデフォルトでは
+無効です — `chematic-mol`の依存クレート一式を引き込むためです。`chematic-mol`が解析・
+検証できないCIF（occupancyの不備、cellパラメータ不足など）はレポートではなくCLIエラーに
+なります。P1を超える対称性を宣言したCIFは（警告付きで）受け付けますが、対称操作を展開
+しないため非対称単位のみである点に注意してください。`batch`はJSONL専用のままです。
+`doctor`はCIFサポートが組み込まれているかどうかを報告します。
 
 ## `chematic`との関係
 
@@ -81,10 +92,8 @@ CLIは`cli` Cargo feature（デフォルトで有効）の裏にあります。`
 
 ## 未実装
 
-CIF/ファイルI/O(上流の`chematic-mol`側のCIF readerがまだ無く、そちらに依存 —
-CIF基盤をmikiwame内で重複実装しない方針は[`AGENTS.md`](AGENTS.md)参照)、多面体歪み・
-組成/酸化数の診断、および根拠のない定数を必要とするしきい値ベースの診断("極端な"格子
-アスペクト比、酸化数テーブルなど)。
+多面体歪み・組成/酸化数の診断、および根拠のない定数を必要とするしきい値ベースの診断
+("極端な"格子アスペクト比、酸化数テーブルなど)。
 
 disorderのしきい値不要サブセット(`DISORDER_PRESENT`、`DISORDER_OCCUPANCY_SUM_EXCEEDS_ONE`)
 と、配位数・局所環境診断(`MaterialDiagnosticReport::local_environment`、AGENTS.md §7.4 —

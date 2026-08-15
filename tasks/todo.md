@@ -41,34 +41,20 @@
       "how close to 1.0 counts as ambiguous" cutoff — would itself be exactly the kind of
       invented threshold AGENTS.md §21 forbids without a citable basis. Needs either a citation
       for that cutoff or a different, threshold-free ambiguity signal.
-- [ ] CIF input: `kent-tokyo/chematic` PR #323 ("feat(mol): CIF to PeriodicStructure
-      adapter, optional `crystal` feature on `chematic-mol`") **merged to `main`
-      2026-08-14T05:37:58Z** — occupancy/disorder-preserving, explicit `CifSymmetryStatus`
-      for unexpanded symmetry, 12 new tests. Still blocked on an actual release, though:
-      `chematic`'s workspace version is still `0.15.0`, and that release (published
-      2026-08-14T02:05:15Z) predates the PR #323 merge — the adapter is on `main`, not in
-      any published `chematic-mol` version yet. Per this project's established pattern
-      (wait for an actual release, not an unreleased `main` — same reasoning applied to
-      chematic-crystal itself before integrating it, and confirmed again here), still
-      parked. PR #324 (POSCAR/CONTCAR) is open and mergeable but not on mikiwame's critical
-      path — only #323 is.
-
-      **Decided ahead of time, for whenever a release lands** (so this isn't re-litigated
-      mid-implementation): add an optional `cif` feature —
-      `cif = ["dep:chematic-mol", "chematic-mol/crystal"]` — gated the same way `cli`
-      gates `serde_json` today. And: `chematic-mol`'s CIF adapter *rejects* malformed
-      input (occupancy-sum-exceeded etc. surface as `chematic_crystal::CrystalError`,
-      per PR #323's own design, matching `chematic_crystal::PeriodicSite`'s
-      validate-at-construction model) — the same tension `docs/chematic-prerequisites.md`
-      already documents between chematic's reject-invalid model and mikiwame's
-      diagnose-don't-refuse one. First-cut resolution: the CIF reader is a convenience
-      input path for *valid* CIFs; a CIF that fails `chematic-mol`'s validation becomes a
-      CLI error (not a diagnosed `InvalidInput` report) — callers who need
-      `INPUT_INVALID_OCCUPANCY`-style diagnosis of a malformed structure use the existing
-      JSON/API input path instead. Mapping CIF parse/validation errors into mikiwame's own
-      finding codes is explicitly deferred (would need a raw, un-validated CIF
-      intermediate representation upstream, which doesn't exist and would meaningfully
-      expand scope) — not attempted in the first CIF-input round.
+- [ ] Three finding codes are structurally unreachable on the CIF input path (see "Done
+      this round" below for what shipped) — `INPUT_UNKNOWN_ELEMENT`,
+      `INPUT_INVALID_OCCUPANCY`, `DISORDER_OCCUPANCY_SUM_EXCEEDS_ONE` — because
+      `chematic-mol` rejects the CIF before mikiwame ever sees it. Not a bug (it's the
+      documented reject-vs-diagnose tradeoff, same as `docs/chematic-prerequisites.md`
+      already names for `chematic_crystal` generally), but a real, user-visible divergence
+      between the CIF and JSON input paths worth someone eventually deciding whether to
+      close (would need a raw, un-validated CIF intermediate representation upstream, same
+      scope-expansion concern noted before CIF was even implemented).
+- [ ] `chematic_crystal::PeriodicSite::label` (e.g. `"Na1"`) is dropped during CIF
+      conversion — mikiwame's `Site` has no label field, so CIF-sourced findings say
+      "site 3", not "site Na1". Not CIF-specific (JSON input never had labels either);
+      adding a `label` field to `Site` is a breaking change (public fields, no constructor)
+      that needs its own decision, not bundled into the CIF round.
 - [ ] Out-of-domain applicability detection (surfaces/interfaces/amorphous/polymers,
       AGENTS.md §5): `analyze` currently always reports `ApplicabilityLevel::FullyApplicable`
       for any input that passes input-quality checks. Parked here rather than implemented:
@@ -276,3 +262,21 @@
       remove three copies of the same `SiteLocalEnvironment` skip-with-reason construction.
       Full quality gate and `scripts/differential_validation.py` re-run after: unchanged
       results (41 Rust tests, 0/31 differential mismatches).
+
+- [x] CIF input (mikiwame 0.3.0): `src/cif.rs::read_cif`, optional `cif` feature
+      (`cif = ["dep:chematic-mol", "chematic-mol/crystal"]`, not in `default`),
+      against `chematic-mol` 0.16.0's published `parse_cif_periodic_structure` (the
+      release PR #323 had been waiting on). Converts to `OwnedStructure`, wired into
+      the CLI's `analyze` via `.cif` extension detection (`batch` stays JSONL-only,
+      not line-oriented data). A CIF `chematic-mol` rejects (occupancy sum exceeded,
+      missing cell tags, etc.) is a CLI error, not a diagnosed `InvalidInput` report —
+      exactly the first-cut resolution decided ahead of time in this file. Multi-species
+      disorder flattens into mikiwame's existing multi-site convention with no changes
+      needed to `diagnostics/disorder.rs`. See `docs/chematic-prerequisites.md`'s
+      2026-08-15 update and `tests/cif.rs` (including a non-cubic fixture specifically
+      chosen to discriminate `chematic_crystal::Lattice::matrix()`'s row-vector
+      convention from a column-vector one, since all of mikiwame's other fixtures are
+      cubic and can't tell the two apart). New backlog items this surfaced (not fixed,
+      see the two new entries in the "Needs a cited source" section above): three
+      finding codes structurally unreachable on the CIF path, and CIF site labels
+      (e.g. "Na1") dropped since `Site` has no label field.

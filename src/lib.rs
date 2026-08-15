@@ -31,6 +31,8 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
+#[cfg(feature = "cif")]
+pub mod cif;
 pub mod config;
 mod diagnostics;
 pub mod error;

@@ -22,6 +22,31 @@ input boundary — the only type that can hold a structure mikiwame is supposed 
 diagnose — and `chematic_crystal` is used internally, for geometry only, after
 `input_quality`'s own checks (see `diagnostics/mod.rs`'s pipeline order).
 
+## Update (2026-08-15): CIF input shipped
+
+`chematic-mol` 0.16.0 published the CIF adapter this document's Phase 0 "requested types"
+section sketched as `read_cif_periodic` (below) — `chematic_mol::cif::parse_cif_periodic_structure`,
+occupancy/disorder-preserving, plus an explicit `CifSymmetryStatus` distinguishing a
+genuinely-P1 file from one whose declared symmetry it did not expand. `mikiwame` now
+depends on it behind an optional `cif` feature (`src/cif.rs`, `mikiwame::cif::read_cif`).
+
+Two differences from the original sketch, both deliberate:
+
+* `read_cif` returns mikiwame's own `OwnedStructure`, not a raw
+  `chematic_crystal::PeriodicStructure` — the reject-vs-diagnose tension the update above
+  documents applies here too: a CIF `chematic-mol` cannot parse or validate is a CLI error,
+  not a diagnosed `InvalidInput` report, so the adapter's job ends at handing back a
+  structure through mikiwame's own boundary, same as every other input path.
+* No new mikiwame-specific error type — `chematic_mol::cif::CifPeriodicError` is reused
+  directly (re-exported from `mikiwame::cif`) rather than wrapped, since its `Display` is
+  already self-contained.
+
+Concrete, user-visible consequence of the reject-at-construction model: three finding codes
+are structurally unreachable on the CIF input path — `INPUT_UNKNOWN_ELEMENT`,
+`INPUT_INVALID_OCCUPANCY`, `DISORDER_OCCUPANCY_SUM_EXCEEDS_ONE` — because a CIF that would
+trigger any of them fails to parse at all. See `src/cif.rs`'s module doc comment and
+`tasks/todo.md`.
+
 The rest of this document is the original Phase 0 finding, left as-is for history.
 
 ## Finding (Phase 0 investigation, 2026-08-13)
