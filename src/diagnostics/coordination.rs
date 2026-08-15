@@ -82,7 +82,7 @@ use chematic_crystal::{FractionalCoord, Occupancy, PeriodicSite, PeriodicStructu
 
 use crate::finding::Finding;
 use crate::radii::{self, covalent_radius_angstrom};
-use crate::report::{NeighborSpeciesCount, SiteLocalEnvironment};
+use crate::report::{NeighborRecord, NeighborSpeciesCount, SiteLocalEnvironment};
 use crate::structure_view::{PeriodicStructureView, coincidence_groups};
 
 /// Sensitivity constant added to a pair's summed covalent radii to decide
@@ -125,6 +125,7 @@ fn not_computed(site_index: usize, reason: String) -> SiteLocalEnvironment {
         site_index,
         coordination_number: None,
         neighbor_species: Vec::new(),
+        neighbors: Vec::new(),
         shell_gap_ratio: None,
         not_computed_reason: Some(reason),
         limitations: Vec::new(),
@@ -251,8 +252,16 @@ pub(crate) fn check<S: PeriodicStructureView>(structure: &S) -> Outcome {
 
         let candidates = neighbors_by_group.get(&group_index).into_iter().flatten();
         let mut excluded_unresolvable = 0usize;
-        let mut included: Vec<(f64, Element)> = Vec::new();
+        let mut candidate_records: Vec<NeighborRecord> = Vec::new();
         for n in candidates {
+            // `n.neighbor_index` is an index into `groups` (the geometry
+            // object `crystal_structure` was built one site per *group*,
+            // not one site per original input site) -- not a mikiwame input
+            // site index. Map back via the group's own recorded
+            // `site_indices` before this leaves the function, or every
+            // downstream consumer of `NeighborRecord::neighbor_site_index`
+            // silently gets the wrong site whenever any disorder group
+            // shifted the group/site index correspondence.
             let neighbor_group = &groups[n.neighbor_index];
             let Some((neighbor_element, neighbor_radius)) = neighbor_group.resolved else {
                 excluded_unresolvable += 1;
@@ -260,23 +269,65 @@ pub(crate) fn check<S: PeriodicStructureView>(structure: &S) -> Outcome {
             };
             let pairwise_cutoff = center_radius + neighbor_radius + BOND_TOLERANCE_ANGSTROM;
             if n.distance <= pairwise_cutoff {
-                included.push((n.distance, neighbor_element));
+                // `resolved: Some` implies exactly one member (see `Group`'s
+                // doc comment), so `site_indices[0]` is that member's real
+                // input site index.
+                let neighbor_site_index = neighbor_group.site_indices[0];
+                candidate_records.push(NeighborRecord {
+                    neighbor_site_index,
+                    element: neighbor_element.symbol().to_string(),
+                    image: n.image,
+                    distance_angstrom: n.distance,
+                    // The *input* occupancy, not the internal PeriodicSite's
+                    // -- `build_periodic_site` assigns every singleton group
+                    // occupancy 1.0 unconditionally (an artifact of
+                    // satisfying chematic_crystal's own validation, not a
+                    // record of the real input), so reading it here would
+                    // silently discard a genuine partial occupancy.
+                    occupancy: sites[neighbor_site_index].occupancy,
+                    included_in_first_shell: false, // set below, once the shell boundary is known
+                });
             }
         }
-        included.sort_by(|a, b| a.0.total_cmp(&b.0));
+        // Deterministic total order: distance decides the shell boundary
+        // (ties among the *other* keys never change which candidates end up
+        // "in" vs. "out", since resolve_shell only compares consecutive
+        // distances), so sorting by the full key up front keeps candidate
+        // order -- and therefore report order -- independent of any
+        // upstream nondeterminism (e.g. `coincidence_groups`' internal
+        // HashMap iteration order) rather than relying on a second pass.
+        candidate_records.sort_by(|a, b| {
+            a.distance_angstrom
+                .total_cmp(&b.distance_angstrom)
+                .then_with(|| a.neighbor_site_index.cmp(&b.neighbor_site_index))
+                .then_with(|| a.image.cmp(&b.image))
+                .then_with(|| a.element.cmp(&b.element))
+        });
 
-        let (shell, gap_ratio) = resolve_shell(&included);
+        let distance_element_view: Vec<(f64, Element)> = candidate_records
+            .iter()
+            .map(|r| {
+                (
+                    r.distance_angstrom,
+                    Element::from_symbol(&r.element).expect(
+                        "NeighborRecord::element was built from a resolved chematic_core::Element's own symbol() above",
+                    ),
+                )
+            })
+            .collect();
+        let (shell, gap_ratio) = resolve_shell(&distance_element_view);
+        let shell_len = shell.len();
 
-        let mut neighbor_species: HashMap<&'static str, usize> = HashMap::new();
-        for (_, element) in shell {
-            *neighbor_species.entry(element.symbol()).or_insert(0) += 1;
+        let mut neighbor_species: HashMap<String, usize> = HashMap::new();
+        for (index, record) in candidate_records.iter_mut().enumerate() {
+            record.included_in_first_shell = index < shell_len;
+            if record.included_in_first_shell {
+                *neighbor_species.entry(record.element.clone()).or_insert(0) += 1;
+            }
         }
         let mut neighbor_species: Vec<NeighborSpeciesCount> = neighbor_species
             .into_iter()
-            .map(|(element, count)| NeighborSpeciesCount {
-                element: element.to_string(),
-                count,
-            })
+            .map(|(element, count)| NeighborSpeciesCount { element, count })
             .collect();
         neighbor_species.sort_by(|a, b| a.element.cmp(&b.element));
 
@@ -288,7 +339,7 @@ pub(crate) fn check<S: PeriodicStructureView>(structure: &S) -> Outcome {
             ));
         }
 
-        let coordination_number = shell.len();
+        let coordination_number = shell_len;
         // A COORDINATION_AMBIGUOUS finding is deliberately not fired in
         // v0.1: `shell_gap_ratio` (below) is already the honest ambiguity
         // signal (larger = more clearly separated; `None` only means "one
@@ -304,6 +355,7 @@ pub(crate) fn check<S: PeriodicStructureView>(structure: &S) -> Outcome {
             site_index,
             coordination_number: Some(coordination_number),
             neighbor_species,
+            neighbors: candidate_records,
             shell_gap_ratio: gap_ratio,
             not_computed_reason: None,
             limitations,

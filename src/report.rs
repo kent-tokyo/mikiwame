@@ -10,7 +10,10 @@ use crate::provenance::Provenance;
 /// report's shape or the meaning of an existing field (AGENTS.md §8, §19).
 ///
 /// `2`: added [`MaterialDiagnosticReport::local_environment`].
-pub const SCHEMA_VERSION: u32 = 2;
+/// `3`: added [`SiteLocalEnvironment::neighbors`] (per-neighbor detail:
+/// which sites, at what distance, via which periodic image, and whether
+/// each candidate was actually counted toward `coordination_number`).
+pub const SCHEMA_VERSION: u32 = 3;
 
 /// A basic summary of the structure that was analyzed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -98,6 +101,50 @@ pub struct NeighborSpeciesCount {
     pub count: usize,
 }
 
+/// One candidate neighbor considered for a site's coordination shell — not
+/// just the ones that ended up counted. `included_in_first_shell = false`
+/// entries are exactly what [`SiteLocalEnvironment::shell_gap_ratio`]
+/// measures separation against: what was just outside the resolved shell
+/// boundary. Before schema version 3 this data was computed internally by
+/// `diagnostics::coordination` and discarded before the report was built.
+///
+/// The unique key for a `NeighborRecord` within one site's `neighbors` list
+/// is `(neighbor_site_index, image)`, not `neighbor_site_index` alone: the
+/// same neighbor site can legitimately appear more than once, reached via
+/// different periodic images (e.g. in a simple-cubic single-site primitive
+/// cell, every neighbor *is* the center's own site, reached via six
+/// different non-zero images). This is expected, not a duplicate to merge.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct NeighborRecord {
+    /// Index into the structure's site list — the neighbor, not the center
+    /// (see the containing [`SiteLocalEnvironment::site_index`] for that).
+    /// Not unique across one site's `neighbors` list on its own; see this
+    /// type's doc comment.
+    pub neighbor_site_index: usize,
+    /// Element symbol of the neighbor.
+    pub element: String,
+    /// Which periodic image of `neighbor_site_index` this specific neighbor
+    /// instance is (matches `chematic_crystal::PeriodicNeighbor::image`).
+    pub image: [i32; 3],
+    /// Euclidean distance from the center to this neighbor image, in
+    /// Angstrom.
+    pub distance_angstrom: f64,
+    /// The neighbor's occupancy, taken from the original input site (not
+    /// from any internally-constructed geometry object, which may assign an
+    /// artificial occupancy for validation purposes only) — may be less
+    /// than `1.0` for a genuinely partially-occupied site. Not itself a
+    /// signal that the neighbor is disordered: a *multi*-species (disorder)
+    /// position is excluded from this list entirely (see
+    /// `diagnostics::coordination`'s module doc comment), independent of
+    /// whether the single species present is fully or partially occupied.
+    pub occupancy: f64,
+    /// Whether this candidate survived the largest-relative-gap step and is
+    /// counted toward `coordination_number`. `false` entries are what
+    /// `shell_gap_ratio` measures separation against.
+    pub included_in_first_shell: bool,
+}
+
 /// Descriptive coordination/local-environment data for one site — not itself
 /// an anomaly. `shell_gap_ratio` is the ambiguity signal (how cleanly
 /// separated the resolved shell is from the next candidate) — v0.1 reports
@@ -118,6 +165,17 @@ pub struct SiteLocalEnvironment {
     /// Breakdown of `coordination_number` by neighbor element. Empty when
     /// `coordination_number` is `None`.
     pub neighbor_species: Vec<NeighborSpeciesCount>,
+    /// Every candidate neighbor considered (within the radius-sum+epsilon
+    /// search bound), not just the ones counted toward
+    /// `coordination_number` — see [`NeighborRecord::included_in_first_shell`].
+    /// Empty exactly when `coordination_number` is `None`. Sorted
+    /// deterministically by distance, then `neighbor_site_index`, then
+    /// `image`, then `element` — never left to depend on internal iteration
+    /// order. `#[serde(default)]` so a schema-version-2 report (which never
+    /// had this field) still deserializes into this type, as an empty list
+    /// rather than an error.
+    #[serde(default)]
+    pub neighbors: Vec<NeighborRecord>,
     /// Ratio between the first excluded candidate's distance and the last
     /// included neighbor's distance: how clearly separated the resolved
     /// shell is from the next one (larger is less ambiguous). `None` when

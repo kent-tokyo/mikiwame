@@ -67,7 +67,61 @@ fn clean_nacl_is_structurally_consistent() {
     for entry in &report.local_environment {
         assert_eq!(entry.coordination_number, Some(6));
         assert_eq!(entry.shell_gap_ratio, None);
+        // Invariant that must hold regardless of which site this is: the
+        // included-count always matches coordination_number, and
+        // re-aggregating included neighbors by element always matches
+        // neighbor_species -- these are two independent views onto the same
+        // `neighbors` list and must never drift apart.
+        let included: Vec<_> = entry
+            .neighbors
+            .iter()
+            .filter(|n| n.included_in_first_shell)
+            .collect();
+        assert_eq!(included.len(), entry.coordination_number.unwrap());
+        let mut recount: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+        for n in &included {
+            *recount.entry(n.element.as_str()).or_insert(0) += 1;
+        }
+        for species in &entry.neighbor_species {
+            assert_eq!(recount.get(species.element.as_str()), Some(&species.count));
+        }
     }
+
+    // Na (site 0, fractional (0,0,0)) has 6 equidistant Cl neighbors, but
+    // only 3 *distinct* Cl site indices (5, 6, 7 -- see nacl_sites' layout)
+    // in this conventional 8-atom cell: each of those three Cl sites sits
+    // exactly on one face-center axis from Na, so it contributes the
+    // neighbor at its own image=[0,0,0] position *and* a second neighbor
+    // via the opposite periodic image on that axis (e.g. site 5 at
+    // fractional (0,0,0.5) is Na's neighbor at image [0,0,0], and again via
+    // image [0,0,-1], which lands at (0,0,-0.5) -- the same physical
+    // distance on the other side of Na). `neighbor_site_index` alone can't
+    // tell those two apart; `(neighbor_site_index, image)` can, and this is
+    // the concrete case that pins the unique key down empirically, not just
+    // in prose. Also exercises the deterministic sort: all six candidates
+    // tie on distance and element ("Cl"), so the reported order is decided
+    // entirely by `neighbor_site_index` then `image`, hand-derived here
+    // rather than merely asserted-nonempty.
+    let na = &report.local_environment[0];
+    let observed: Vec<(usize, [i32; 3])> = na
+        .neighbors
+        .iter()
+        .map(|n| (n.neighbor_site_index, n.image))
+        .collect();
+    assert_eq!(
+        observed,
+        vec![
+            (5, [0, 0, -1]),
+            (5, [0, 0, 0]),
+            (6, [0, -1, 0]),
+            (6, [0, 0, 0]),
+            (7, [-1, 0, 0]),
+            (7, [0, 0, 0]),
+        ]
+    );
+    assert!(na.neighbors.iter().all(|n| n.element == "Cl"));
+    assert!(na.neighbors.iter().all(|n| n.included_in_first_shell));
+    assert!(na.neighbors.iter().all(|n| n.occupancy == 1.0));
 }
 
 #[test]
