@@ -654,12 +654,18 @@ mikiwame explain report.json \
 mikiwame doctor
 ```
 
-CIF adapterが利用可能になったら次を追加します。
+CIF adapterが利用可能な場合、`analyze`は単一のCIFファイルを受け付けます。
 
 ```bash
-mikiwame analyze material.cif
-mikiwame batch ./cifs/*.cif --output reports.jsonl
+mikiwame analyze material.cif --format json
+mikiwame analyze material.cif --format markdown
 ```
+
+`batch`は1行1構造のJSONL入力専用です（`.cif` globは複数ファイルを列挙するという別の
+入力モデルであり、意図的に対象外としています）。複数CIFの一括解析は、ファイル名と各
+reportの対応、途中失敗時の扱い、非P1 CIFのskip/abort方針などを別途設計するまで未対応
+とし、既存の`batch`へ無理に詰め込みません。将来必要になった場合も、`mikiwame
+analyze-dir ./cifs --output reports.jsonl`のような別コマンドとして設計するのが自然です。
 
 `doctor`は少なくとも次を出力します。
 
