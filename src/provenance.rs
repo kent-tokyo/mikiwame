@@ -14,14 +14,17 @@ pub struct Provenance {
     /// randomness is used).
     pub deterministic: bool,
     /// Version of the elemental-radius table used for distance checks, if
-    /// any were run. `None` in v0.1: no radius-based check ships yet (see
-    /// `tasks/todo.md`).
+    /// any were run. `Some("cordero-2008-table2")` whenever
+    /// `ComponentName::Coordination` ran (its neighbor-search cutoff is the
+    /// table's only consumer so far); `None` if that component didn't run.
     pub radius_table_version: Option<String>,
     /// Version of the formal oxidation-state table used, if composition
     /// checks were run. `None` in v0.1: not implemented yet.
     pub oxidation_table_version: Option<String>,
-    /// Name of the coordination-environment method used, if coordination
-    /// checks were run. `None` in v0.1: not implemented yet.
+    /// Name of the coordination-environment method used, if
+    /// `ComponentName::Coordination` ran; `None` if it didn't (e.g. skipped
+    /// for a lattice `chematic_crystal::Lattice::from_matrix` rejects — see
+    /// `diagnostics::coordination`).
     pub coordination_method: Option<String>,
 }
 

@@ -1,13 +1,18 @@
 //! Covalent radius reference data — embedded per owner approval (elemental
-//! radius table source decided: Cordero et al. 2008), but **not yet consumed
-//! by any diagnostic**. See `docs/validation.md` for why: a naive
-//! `observed_distance < covalent_radius_sum` comparison produces a false
-//! positive on the already-shipped ideal-perovskite fixture (Ti–O in SrTiO3
-//! is a textbook-normal 1.9525 Å bond, below the covalent-radii sum of
-//! 2.26 Å) — covalent radii predict bonded distance well for covalent
-//! networks (diamond, zinc blende) but not for ionic bonding, and most
-//! inorganic crystals mikiwame targets are at least partly ionic. Doing this
-//! correctly needs oxidation-state-aware ionic radii, not this table alone.
+//! radius table source decided: Cordero et al. 2008). Consumed by
+//! `diagnostics::coordination` as an *outer bound* on candidate neighbor
+//! distance (radius-sum plus a tolerance), not as a precise "expected
+//! distance" — that narrower use remains unsafe. See `docs/validation.md`
+//! for why: a naive `observed_distance < covalent_radius_sum` comparison
+//! produces a false positive on the already-shipped ideal-perovskite
+//! fixture (Ti–O in SrTiO3 is a textbook-normal 1.9525 Å bond, below the
+//! covalent-radii sum of 2.26 Å) — covalent radii predict bonded distance
+//! well for covalent networks (diamond, zinc blende) but not for ionic
+//! bonding, and most inorganic crystals mikiwame targets are at least
+//! partly ionic. `SITE_SEVERE_OVERLAP`/`SITE_UNUSUALLY_SHORT_DISTANCE`
+//! (which need that narrower, precise claim) still aren't implemented;
+//! doing those correctly needs oxidation-state-aware ionic radii, not this
+//! table alone.
 //!
 //! Source: Cordero, B.; Gómez, V.; Platero-Prats, A. E.; Revés, M.;
 //! Echeverría, J.; Cremades, E.; Barragán, F.; Alvarez, S. "Covalent radii

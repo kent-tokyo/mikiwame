@@ -253,3 +253,26 @@
       `NamedTemporaryFile(delete=False)` (leaked a file per run) to
       `tempfile.TemporaryDirectory()` (cleaned up automatically). Re-ran after both fixes:
       still 0 mismatches out of 31 sites, mikiwame 0.2.0 / pymatgen 2026.5.4.
+- [x] General bug-check and refactoring pass across all of `src/`. Found and fixed:
+      `src/provenance.rs`'s `radius_table_version`/`coordination_method` field docs still
+      said "None in v0.1: not implemented yet" though both are populated by the
+      coordination-number round; `src/radii.rs`'s module doc comment still said "not yet
+      consumed by any diagnostic" directly contradicting `RADIUS_TABLE_VERSION`'s own doc
+      comment 30 lines below in the same file; `src/lib.rs`'s crate-level doc overclaimed
+      that coordination-number anomalies are reported "as machine-readable Findings" when
+      currently none are (only descriptive `local_environment` data, since
+      `FindingCode::CoordinationAmbiguous` was removed before shipping); `doctor`'s
+      "enabled features: none" line was wrong — `cli` is necessarily enabled for the
+      binary to run at all. No logic bugs found (checked: index bounds, `.unwrap()`/
+      `.expect()` justification, the exact/fallback dispatch, `resolve_shell`'s edge
+      cases) — the bugs found this pass were all doc/output-text staleness, not behavior.
+      Refactored: `structure_view::minimum_image` reconstructed (and re-validated —
+      matrix inversion included) `chematic_crystal::Lattice` from the raw matrix on
+      *every* pairwise call, including inside the O(n^2) scans in `coincidence_groups`
+      and `separation::check` — now `ResolvedLattice::resolve` builds it once per `check()`
+      call and `.minimum_image()` reuses it; the old free function had no remaining
+      caller so it was removed rather than kept as unexercised API surface, and its tests
+      now call `ResolvedLattice` directly. Also extracted `coordination::not_computed()` to
+      remove three copies of the same `SiteLocalEnvironment` skip-with-reason construction.
+      Full quality gate and `scripts/differential_validation.py` re-run after: unchanged
+      results (41 Rust tests, 0/31 differential mismatches).

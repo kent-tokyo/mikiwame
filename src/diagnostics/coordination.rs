@@ -58,7 +58,7 @@
 //!   `LATTICE_SINGULAR` check is fatal only for non-positive volume, so a
 //!   structure can reach here with a lattice this crate still can't build a
 //!   geometry object from. No naive-fallback neighbor search exists to fall
-//!   back to (unlike `structure_view::minimum_image`, there was never a
+//!   back to (unlike `structure_view::ResolvedLattice::minimum_image`, there was never a
 //!   from-scratch one in mikiwame here), so the component reports
 //!   `ComponentStatus::Skipped` rather than inventing one.
 //! - A site whose element symbol doesn't resolve to a `chematic_core::Element`,
@@ -115,6 +115,20 @@ pub(crate) fn method_description() -> String {
         "covalent-radius-sum-plus-tolerance(epsilon={BOND_TOLERANCE_ANGSTROM}A, largest-relative-gap shell detection, {})",
         radii::RADIUS_TABLE_VERSION
     )
+}
+
+/// A `SiteLocalEnvironment` entry for a site whose coordination number
+/// wasn't computed, with `reason` explaining why (disorder, or no citable
+/// radius) — see the module doc comment's "What gets skipped" section.
+fn not_computed(site_index: usize, reason: String) -> SiteLocalEnvironment {
+    SiteLocalEnvironment {
+        site_index,
+        coordination_number: None,
+        neighbor_species: Vec::new(),
+        shell_gap_ratio: None,
+        not_computed_reason: Some(reason),
+        limitations: Vec::new(),
+    }
 }
 
 /// One coincidence group (positionally-merged site or sites), resolved to
@@ -214,34 +228,24 @@ pub(crate) fn check<S: PeriodicStructureView>(structure: &S) -> Outcome {
         let group = &groups[group_index];
 
         if group.site_indices.len() > 1 {
-            local_environment.push(SiteLocalEnvironment {
+            local_environment.push(not_computed(
                 site_index,
-                coordination_number: None,
-                neighbor_species: Vec::new(),
-                shell_gap_ratio: None,
-                not_computed_reason: Some(
-                    "site belongs to a disordered (multi-species) position; combined \
-                     coordination number for disorder is not computed in v0.1"
-                        .to_string(),
-                ),
-                limitations: Vec::new(),
-            });
+                "site belongs to a disordered (multi-species) position; combined \
+                 coordination number for disorder is not computed in v0.1"
+                    .to_string(),
+            ));
             continue;
         }
 
         let Some((_center_element, center_radius)) = group.resolved else {
-            local_environment.push(SiteLocalEnvironment {
+            local_environment.push(not_computed(
                 site_index,
-                coordination_number: None,
-                neighbor_species: Vec::new(),
-                shell_gap_ratio: None,
-                not_computed_reason: Some(format!(
+                format!(
                     "no covalent radius available for element \"{}\" (unrecognized, or outside \
                      Cordero et al. 2008's Z=1-96 coverage)",
                     sites[site_index].element
-                )),
-                limitations: Vec::new(),
-            });
+                ),
+            ));
             continue;
         };
 

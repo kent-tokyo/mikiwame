@@ -7,7 +7,7 @@
 
 use crate::finding::{Evidence, Finding, FindingCode, FindingScope, NumericEvidence};
 use crate::model::{MetricCode, Score01, Severity, Unit};
-use crate::structure_view::{PeriodicStructureView, minimum_image};
+use crate::structure_view::{PeriodicStructureView, ResolvedLattice};
 
 // ponytail: numerical-identity tolerance (float round-trip noise), not a
 // chemistry judgment about how close atoms may physically sit — that is
@@ -19,7 +19,8 @@ fn certain() -> Score01 {
 }
 
 pub(crate) fn check<S: PeriodicStructureView>(structure: &S) -> Vec<Finding> {
-    let lattice = structure.lattice();
+    // Resolved once, not once per pair -- see ResolvedLattice's doc comment.
+    let resolved_lattice = ResolvedLattice::resolve(structure.lattice());
     let sites = structure.sites();
     let mut findings = Vec::new();
 
@@ -28,7 +29,7 @@ pub(crate) fn check<S: PeriodicStructureView>(structure: &S) -> Vec<Finding> {
             if sites[i].element != sites[j].element {
                 continue;
             }
-            let distance = minimum_image(lattice, sites[i].fractional, sites[j].fractional);
+            let distance = resolved_lattice.minimum_image(sites[i].fractional, sites[j].fractional);
             if distance.distance_angstrom < DUPLICATE_TOLERANCE_ANGSTROM {
                 findings.push(Finding {
                     code: FindingCode::SiteDuplicate,

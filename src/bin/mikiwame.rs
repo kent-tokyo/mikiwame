@@ -189,7 +189,9 @@ fn cmd_doctor() {
          neighbor search); PeriodicStructureView stays mikiwame's own input boundary — see \
          docs/chematic-prerequisites.md"
     );
-    println!("enabled features: none");
+    // This binary only exists when the `cli` feature is enabled
+    // (required-features in Cargo.toml), so it's necessarily on here.
+    println!("enabled features: cli");
     println!(
         "radius table: cordero-2008-table2, used by the coordination component's neighbor \
          cutoff; SITE_SEVERE_OVERLAP / SITE_UNUSUALLY_SHORT_DISTANCE still not implemented \

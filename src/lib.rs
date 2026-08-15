@@ -6,11 +6,13 @@
 //!
 //! # What this answers
 //!
-//! Input-quality problems, lattice/cell validity, disorder, and coordination
-//! number / local environment anomalies as machine-readable
-//! [`finding::Finding`]s, each with its own severity, confidence, and
-//! evidence. Descriptive (non-anomaly) per-site coordination data is
-//! reported separately via [`report::MaterialDiagnosticReport::local_environment`].
+//! Input-quality problems, lattice/cell validity, and disorder anomalies as
+//! machine-readable [`finding::Finding`]s, each with its own severity,
+//! confidence, and evidence. Per-site coordination number / local
+//! environment is reported too, but descriptively rather than as a
+//! finding — a coordination number on its own isn't an anomaly — via
+//! [`report::MaterialDiagnosticReport::local_environment`]; no
+//! coordination-derived finding (e.g. under/overcoordination) ships yet.
 //! Distortion and composition/oxidation-state checks are not implemented yet
 //! (see `tasks/todo.md`).
 //!
